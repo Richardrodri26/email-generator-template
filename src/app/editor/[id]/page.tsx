@@ -35,6 +35,7 @@ export default function EditorPage() {
   const initialize = useEditorStore((state) => state.initialize);
   const addNode = useEditorStore((state) => state.addNode);
   const moveNode = useEditorStore((state) => state.moveNode);
+  const reorderNode = useEditorStore((state) => state.reorderNode);
   const currentData = useEditorStore((state) => state.data);
 
   // Load Template
@@ -74,7 +75,25 @@ export default function EditorPage() {
     if (!over) return;
     
     const isNew = active.data.current?.isNew;
-    const parentId = over.id as string;
+    const overId = over.id as string;
+    const overNode = currentData?.nodes[overId];
+    // Determine the actual parent. If we are dragging over a container, the parent is the container. If we are dragging over an item, the parent is the item's parent.
+    const isOverContainer = overNode?.type === "ROOT" || overNode?.type === "CONTAINER" || overNode?.type === "COLUMNS";
+    
+    let parentId = overId;
+    let insertIndex = undefined;
+
+    if (!isOverContainer) {
+      // Find parent of the over node
+      for (const [nodeId, node] of Object.entries(currentData!.nodes)) {
+        const idx = node.children.indexOf(overId);
+        if (idx !== -1) {
+          parentId = nodeId;
+          insertIndex = idx;
+          break;
+        }
+      }
+    }
 
     if (isNew) {
       const type = active.data.current?.type as EditorNodeType;
@@ -85,11 +104,26 @@ export default function EditorPage() {
         type,
         props: getDefaultProps(type),
         children: []
-      });
+      }, insertIndex);
     } else {
-      // Reoder/move existing node
+      // It's an existing node
       if (active.id !== over.id) {
-        moveNode(active.id as string, parentId, 0); // simplify: just append to parent for now
+        if (parentId === overId && isOverContainer) {
+          // Moved into a new container
+          moveNode(active.id as string, parentId, 0);
+        } else {
+          // Sort/Reorder within the same parent or moving to a specific index in a different parent
+          // To keep it robust, let's check if they belong to the same parent first
+          const activeParentId = Object.keys(currentData!.nodes).find(key => currentData!.nodes[key].children.includes(active.id as string));
+          
+          if (activeParentId === parentId) {
+            // Reorder inside the same sequence
+            reorderNode(parentId, active.id as string, over.id as string);
+          } else {
+            // Move across containers
+            moveNode(active.id as string, parentId, insertIndex ?? 0);
+          }
+        }
       }
     }
   };
@@ -174,7 +208,7 @@ export default function EditorPage() {
       >
         <div className="flex-1 flex overflow-hidden">
           <EditorSidebar />
-          <EditorCanvas />
+          <EditorCanvas themeCSS={themeCSS} />
           <EditorPropertiesPanel />
         </div>
 
@@ -196,6 +230,10 @@ function getDefaultProps(type: EditorNodeType) {
     case 'BUTTON': return { content: 'Click Here', href: '#', style: { backgroundColor: '#f97316', color: '#ffffff', padding: '12px 24px' } };
     case 'IMAGE': return { src: 'https://placehold.co/600x400', alt: 'Placeholder', style: { width: '100%', borderRadius: '8px' } };
     case 'CONTAINER': return { style: { padding: '20px', backgroundColor: '#f8fafc' } };
+    case 'DIVIDER': return { style: { borderTop: '1px solid #e2e8f0', margin: '20px 0', width: '100%' } };
+    case 'SPACER': return { height: '40px', style: {} };
+    case 'COLUMNS': return { style: { display: 'flex', gap: '20px', flexDirection: 'row', width: '100%' } };
+    case 'SOCIAL': return { style: { display: 'flex', gap: '10px', justifyContent: 'center', padding: '10px' } };
     default: return {};
   }
 }

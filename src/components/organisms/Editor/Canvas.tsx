@@ -1,7 +1,8 @@
 "use client";
 
 import { useEditorStore } from "@/application/useEditorStore";
-import { useDroppable } from "@dnd-kit/core";
+import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { EditorNode } from "@/domain/models/Template";
 
 interface NodeRendererProps {
@@ -18,11 +19,14 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
   const isSelected = selectedNodeId === nodeId;
   const isContainer = node.type === "ROOT" || node.type === "CONTAINER";
 
-  // Base Dropzone for containers
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef, isOver, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: nodeId,
-    disabled: !isContainer,
-    data: { acceptsChildren: isContainer },
+    data: { 
+      type: node.type,
+      nodeId,
+      acceptsChildren: isContainer 
+    },
+    disabled: node.type === "ROOT", // Root cannot be moved
   });
 
   const handleClick = (e: React.MouseEvent) => {
@@ -30,20 +34,27 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     selectNode(nodeId);
   };
 
+  const draggingStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  };
+
   const wrapWithSelection = (children: React.ReactNode) => (
     <div
-      ref={isContainer ? setNodeRef : null}
+      ref={setNodeRef}
       onClick={handleClick}
       className={`relative transition-all ${
         isSelected ? "ring-2 ring-orange-500 ring-offset-2 z-10" : "hover:ring-1 hover:ring-slate-300"
-      } ${isOver ? "bg-orange-50/50 outline outline-2 outline-orange-400 outline-dashed" : ""}`}
+      } ${isOver && isContainer ? "bg-orange-50/50 outline outline-2 outline-orange-400 outline-dashed" : ""}`}
       style={{
         ...node.props.style,
+        ...draggingStyle,
         minHeight: isContainer && node.children.length === 0 ? "50px" : "auto",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
+        position: "relative",
       }}
+      {...(node.type !== "ROOT" ? attributes : {})}
+      {...(node.type !== "ROOT" ? listeners : {})}
     >
       {isSelected && node.type !== "ROOT" && (
         <div className="absolute -top-6 left-0 bg-orange-500 text-white text-xs px-2 py-1 rounded-t-md font-medium z-20">
@@ -99,31 +110,63 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
           }} 
         />
       );
+    case "DIVIDER":
+      return wrapWithSelection(
+        <hr style={{ width: "100%", borderTop: "1px solid #e5e7eb", borderBottom: "none", borderLeft: "none", borderRight: "none", margin: "20px 0", ...node.props.style }} />
+      );
+    case "SPACER":
+      return wrapWithSelection(
+        <div style={{ height: node.props.height || "40px", width: "100%", ...node.props.style }}></div>
+      );
+    case "COLUMNS":
+      return wrapWithSelection(
+        <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
+          <div style={{ display: "flex", gap: "20px", flexDirection: "row", width: "100%", ...node.props.style }}>
+            {node.children.map((childId) => (
+              <NodeRenderer key={childId} nodeId={childId} />
+            ))}
+          </div>
+        </SortableContext>
+      );
+    case "SOCIAL":
+      return wrapWithSelection(
+        <div style={{ display: "flex", gap: "10px", justifyContent: "center", padding: "10px", ...node.props.style }}>
+          <div style={{ width: 32, height: 32, backgroundColor: "#3b5998", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "14px", fontWeight: "bold", textDecoration: "none" }}>f</div>
+          <div style={{ width: 32, height: 32, backgroundColor: "#1da1f2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "14px", fontWeight: "bold", textDecoration: "none" }}>t</div>
+          <div style={{ width: 32, height: 32, backgroundColor: "#2867B2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "14px", fontWeight: "bold", textDecoration: "none" }}>in</div>
+        </div>
+      );
     case "ROOT":
     case "CONTAINER":
       return wrapWithSelection(
-        <>
+        <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
           {node.children.map((childId) => (
             <NodeRenderer key={childId} nodeId={childId} />
           ))}
-        </>
+        </SortableContext>
       );
     default:
       return null;
   }
 }
 
-export function EditorCanvas() {
+export function EditorCanvas({ themeCSS }: { themeCSS?: string }) {
   const rootNodeId = useEditorStore((state) => state.data.rootNodeId);
   const selectNode = useEditorStore((state) => state.selectNode);
+
+  // Scope the CSS to the editor preview area
+  const scopedCSS = themeCSS 
+    ? themeCSS.replace(/:root/g, '.email-editor-preview').replace(/\.dark/g, '.email-editor-preview.dark') 
+    : "";
 
   return (
     <div 
       className="flex-1 bg-slate-200/50 overflow-y-auto p-8 flex justify-center items-start"
       onClick={() => selectNode(null)}
     >
+      <style>{scopedCSS}</style>
       {/* Email dimensions wrapper */}
-      <div className="w-full max-w-[600px] min-h-[800px] bg-white shadow-xl rounded-sm">
+      <div className="w-full max-w-[600px] min-h-[800px] bg-white shadow-xl rounded-sm email-editor-preview">
         <NodeRenderer nodeId={rootNodeId} />
       </div>
     </div>

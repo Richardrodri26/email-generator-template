@@ -1,4 +1,13 @@
-export type EditorNodeType = "ROOT" | "TEXT" | "BUTTON" | "IMAGE" | "CONTAINER";
+export type EditorNodeType =
+  | "ROOT"
+  | "TEXT"
+  | "BUTTON"
+  | "IMAGE"
+  | "CONTAINER"
+  | "DIVIDER"
+  | "SPACER"
+  | "COLUMNS"
+  | "SOCIAL";
 
 export interface EditorNode {
   id: string;

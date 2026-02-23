@@ -2,7 +2,7 @@
 
 import { useEditorStore } from "@/application/useEditorStore";
 import { Button } from "@/components/ui/button";
-import { Type, Square, Image as ImageIcon, Layout as LayoutIcon, Trash2 } from "lucide-react";
+import { Type, Square, Image as ImageIcon, Layout as LayoutIcon, Minus, BoxSelect, SplitSquareHorizontal, Link } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 
 const BLOCKS = [
@@ -10,6 +10,10 @@ const BLOCKS = [
   { type: "BUTTON", label: "Button", icon: Square },
   { type: "IMAGE", label: "Image", icon: ImageIcon },
   { type: "CONTAINER", label: "Container", icon: LayoutIcon },
+  { type: "DIVIDER", label: "Divider", icon: Minus },
+  { type: "SPACER", label: "Spacer", icon: BoxSelect },
+  { type: "COLUMNS", label: "Columns", icon: SplitSquareHorizontal },
+  { type: "SOCIAL", label: "Social", icon: Link },
 ];
 
 function DraggableBlock({ type, label, icon: Icon }: any) {
