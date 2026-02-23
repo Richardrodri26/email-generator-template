@@ -29,6 +29,7 @@ export default function EditorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [activeDragType, setActiveDragType] = useState<string | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [themeCSS, setThemeCSS] = useState("");
 
   // Editor Store actions
@@ -63,13 +64,19 @@ export default function EditorPage() {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const isNew = active.data.current?.isNew;
+    setActiveDragId(active.id as string);
     if (isNew) {
       setActiveDragType(active.data.current?.type);
+    } else {
+      // Existing node being dragged
+      const draggedNode = currentData?.nodes[active.id as string];
+      setActiveDragType(draggedNode?.type || null);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveDragType(null);
+    setActiveDragId(null);
     const { active, over } = event;
     
     if (!over) return;
@@ -78,7 +85,7 @@ export default function EditorPage() {
     const overId = over.id as string;
     const overNode = currentData?.nodes[overId];
     // Determine the actual parent. If we are dragging over a container, the parent is the container. If we are dragging over an item, the parent is the item's parent.
-    const isOverContainer = overNode?.type === "ROOT" || overNode?.type === "CONTAINER" || overNode?.type === "COLUMNS";
+    const isOverContainer = overNode?.type === "ROOT" || overNode?.type === "CONTAINER" || overNode?.type === "COLUMNS" || overNode?.type === "CARD";
     
     let parentId = overId;
     let insertIndex = undefined;
@@ -202,7 +209,7 @@ export default function EditorPage() {
 
       {/* Editor Main */}
       <DndContext 
-        collisionDetection={closestCenter} 
+        collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
@@ -212,10 +219,11 @@ export default function EditorPage() {
           <EditorPropertiesPanel />
         </div>
 
-        <DragOverlay>
+        <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
           {activeDragType ? (
-            <div className="p-4 rounded-md border-2 border-orange-500 bg-orange-100 text-orange-700 font-bold shadow-xl opacity-80 backdrop-blur-sm">
-              Dropping {activeDragType}...
+            <div className="px-4 py-3 rounded-lg border-2 border-primary bg-primary/10 text-primary font-semibold shadow-2xl backdrop-blur-sm text-sm flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              {activeDragType}
             </div>
           ) : null}
         </DragOverlay>
@@ -226,14 +234,24 @@ export default function EditorPage() {
 
 function getDefaultProps(type: EditorNodeType) {
   switch (type) {
-    case 'TEXT': return { content: 'Add your text here...', style: { color: '#333333', padding: '10px' } };
-    case 'BUTTON': return { content: 'Click Here', href: '#', style: { backgroundColor: '#f97316', color: '#ffffff', padding: '12px 24px' } };
-    case 'IMAGE': return { src: 'https://placehold.co/600x400', alt: 'Placeholder', style: { width: '100%', borderRadius: '8px' } };
-    case 'CONTAINER': return { style: { padding: '20px', backgroundColor: '#f8fafc' } };
-    case 'DIVIDER': return { style: { borderTop: '1px solid #e2e8f0', margin: '20px 0', width: '100%' } };
+    case 'TEXT': return { content: 'Add your text here...', style: { color: 'var(--foreground)' } };
+    case 'BUTTON': return { content: 'Click Here', href: '#', style: {} };
+    case 'IMAGE': return { src: 'https://placehold.co/600x400', alt: 'Placeholder', style: { width: '100%', borderRadius: 'var(--radius)' } };
+    case 'CONTAINER': return { style: { padding: '20px', backgroundColor: 'transparent' } };
+    case 'DIVIDER': return { style: { width: '100%' } };
     case 'SPACER': return { height: '40px', style: {} };
     case 'COLUMNS': return { style: { display: 'flex', gap: '20px', flexDirection: 'row', width: '100%' } };
     case 'SOCIAL': return { style: { display: 'flex', gap: '10px', justifyContent: 'center', padding: '10px' } };
+    case 'CARD': return { cardTitle: 'Card Title', cardDescription: 'Short description here', style: { width: '100%' } };
+    case 'TABLE': return {
+      headers: ['Name', 'Status', 'Amount'],
+      rows: [
+        ['Project Alpha', 'Active', '$2,500'],
+        ['Project Beta', 'Pending', '$1,200'],
+      ],
+      style: { width: '100%' },
+    };
     default: return {};
   }
 }
+

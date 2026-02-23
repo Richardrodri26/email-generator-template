@@ -7,7 +7,9 @@ export type EditorNodeType =
   | "DIVIDER"
   | "SPACER"
   | "COLUMNS"
-  | "SOCIAL";
+  | "SOCIAL"
+  | "CARD"
+  | "TABLE";
 
 export interface EditorNode {
   id: string;

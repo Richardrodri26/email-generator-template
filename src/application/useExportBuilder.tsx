@@ -62,6 +62,42 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
             </Column>
           </Row>
         );
+      case "CARD":
+        return (
+          <Section key={node.id} style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", ...node.props.style }}>
+            {node.props.cardTitle && (
+              <Section style={{ padding: "24px 24px 0 24px" }}>
+                <Text style={{ fontSize: "16px", fontWeight: "600", margin: "0" }}>{node.props.cardTitle}</Text>
+                {node.props.cardDescription && (
+                  <Text style={{ fontSize: "14px", color: "#6b7280", margin: "6px 0 0 0" }}>{node.props.cardDescription}</Text>
+                )}
+              </Section>
+            )}
+            <Section style={{ padding: "16px 24px" }}>
+              {children}
+            </Section>
+          </Section>
+        );
+      case "TABLE": {
+        const headers = node.props.headers || ["Header 1", "Header 2", "Header 3"];
+        const rows = node.props.rows || [["Cell 1", "Cell 2", "Cell 3"]];
+        return (
+          <Section key={node.id} style={{ width: "100%", ...node.props.style }}>
+            <Row style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+              {headers.map((h: string, i: number) => (
+                <Column key={i} style={{ padding: "12px 16px", fontSize: "12px", fontWeight: "500", color: "#6b7280", textTransform: "uppercase" as const }}>{h}</Column>
+              ))}
+            </Row>
+            {rows.map((row: string[], ri: number) => (
+              <Row key={ri} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                {row.map((cell: string, ci: number) => (
+                  <Column key={ci} style={{ padding: "16px", fontSize: "14px" }}>{cell}</Column>
+                ))}
+              </Row>
+            ))}
+          </Section>
+        );
+      }
       case "ROOT":
         return (
           <Container key={node.id} style={node.props.style}>
@@ -92,6 +128,6 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
 
 export async function generateHtmlExport(data: TemplateData, themeCSS: string = ""): Promise<string> {
   const component = generateReactEmailElement(data, themeCSS);
-  const html = await render(component, { pretty: true });
+  const html = await render(component);
   return html;
 }

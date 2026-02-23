@@ -43,11 +43,50 @@ export function EditorPropertiesPanel() {
       </div>
 
       <div className="p-4 flex-1 overflow-y-auto space-y-6">
-        {/* TEXT specific props */}
+        {/* ── Size / Width (all non-ROOT elements) ── */}
+        {node.type !== "ROOT" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Size</h3>
+            <div>
+              <Label className="text-xs text-slate-500 mb-1 block">Width</Label>
+              <select
+                value={node.props.style?.width || "100%"}
+                onChange={(e) => handleStyleChange("width", e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+              >
+                <option value="100%">12/12 — Full</option>
+                <option value="91.6667%">11/12</option>
+                <option value="83.3333%">10/12</option>
+                <option value="75%">9/12 — Three Quarter</option>
+                <option value="66.6667%">8/12 — Two Third</option>
+                <option value="58.3333%">7/12</option>
+                <option value="50%">6/12 — Half</option>
+                <option value="41.6667%">5/12</option>
+                <option value="33.3333%">4/12 — One Third</option>
+                <option value="25%">3/12 — Quarter</option>
+                <option value="16.6667%">2/12</option>
+                <option value="8.3333%">1/12</option>
+              </select>
+            </div>
+            {node.props.style?.height && (
+              <div>
+                <Label className="text-xs text-slate-500 mb-1 block">Height</Label>
+                <Input
+                  value={node.props.style?.height || "auto"}
+                  onChange={(e) => handleStyleChange("height", e.target.value)}
+                  placeholder="e.g. 200px"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TEXT ── */}
         {node.type === "TEXT" && (
           <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Content</h3>
             <div>
-              <Label className="text-xs text-slate-500 mb-1 block">Content</Label>
+              <Label className="text-xs text-slate-500 mb-1 block">Text</Label>
               <Input 
                 value={node.props.content || ""} 
                 onChange={(e) => handleChange("content", e.target.value)}
@@ -74,9 +113,10 @@ export function EditorPropertiesPanel() {
           </div>
         )}
 
-        {/* BUTTON specific props */}
+        {/* ── BUTTON ── */}
         {node.type === "BUTTON" && (
           <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Button</h3>
             <div>
               <Label className="text-xs text-slate-500 mb-1 block">Button Text</Label>
               <Input 
@@ -112,9 +152,10 @@ export function EditorPropertiesPanel() {
           </div>
         )}
 
-        {/* IMAGE specific props */}
+        {/* ── IMAGE ── */}
         {node.type === "IMAGE" && (
           <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Image</h3>
             <div>
               <Label className="text-xs text-slate-500 mb-1 block">Image URL</Label>
               <Input 
@@ -133,9 +174,109 @@ export function EditorPropertiesPanel() {
           </div>
         )}
 
-        {/* Generic Padding (applicable to containers and root) */}
+        {/* ── CARD ── */}
+        {node.type === "CARD" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Card</h3>
+            <div>
+              <Label className="text-xs text-slate-500 mb-1 block">Title</Label>
+              <Input
+                value={node.props.cardTitle || ""}
+                onChange={(e) => handleChange("cardTitle", e.target.value)}
+                placeholder="Card title..."
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-slate-500 mb-1 block">Description</Label>
+              <Input
+                value={node.props.cardDescription || ""}
+                onChange={(e) => handleChange("cardDescription", e.target.value)}
+                placeholder="Short description..."
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-slate-500 mb-1 block">Background Color</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="color"
+                  value={node.props.style?.backgroundColor || "#ffffff"}
+                  onChange={(e) => handleStyleChange("backgroundColor", e.target.value)}
+                  className="w-12 p-1 h-9"
+                />
+                <Input
+                  type="text"
+                  value={node.props.style?.backgroundColor || "#ffffff"}
+                  onChange={(e) => handleStyleChange("backgroundColor", e.target.value)}
+                  className="flex-1 font-mono text-sm"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TABLE ── */}
+        {node.type === "TABLE" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Table</h3>
+            <div>
+              <Label className="text-xs text-slate-500 mb-1 block">Headers (comma-separated)</Label>
+              <Input
+                value={(node.props.headers || []).join(", ")}
+                onChange={(e) =>
+                  handleChange(
+                    "headers",
+                    e.target.value.split(",").map((s: string) => s.trim()),
+                  )
+                }
+                placeholder="Col 1, Col 2, Col 3"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-slate-500 mb-1 block">Rows</Label>
+              {(node.props.rows || []).map((row: string[], ri: number) => (
+                <div key={ri} className="flex gap-1 items-center">
+                  <Input
+                    value={row.join(", ")}
+                    onChange={(e) => {
+                      const newRows = [...(node.props.rows || [])];
+                      newRows[ri] = e.target.value.split(",").map((s: string) => s.trim());
+                      handleChange("rows", newRows);
+                    }}
+                    className="flex-1 font-mono text-xs"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-400 hover:text-red-600"
+                    onClick={() => {
+                      const newRows = (node.props.rows || []).filter((_: string[], i: number) => i !== ri);
+                      handleChange("rows", newRows);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => {
+                  const colCount = (node.props.headers || []).length || 3;
+                  const newRow = Array(colCount).fill("—");
+                  handleChange("rows", [...(node.props.rows || []), newRow]);
+                }}
+              >
+                + Add Row
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── ROOT / CONTAINER ── */}
         {(node.type === "ROOT" || node.type === "CONTAINER") && (
           <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Container</h3>
             <div>
               <Label className="text-xs text-slate-500 mb-1 block">Background Color</Label>
               <div className="flex gap-2">
