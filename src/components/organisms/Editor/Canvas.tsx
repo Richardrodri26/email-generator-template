@@ -161,7 +161,7 @@ export function EditorCanvas({ themeCSS }: { themeCSS?: string }) {
 
   return (
     <div 
-      className="flex-1 bg-slate-200/50 overflow-y-auto p-8 flex justify-center items-start"
+      className="flex-1 bg-background overflow-y-auto p-8 flex justify-center items-start"
       onClick={() => selectNode(null)}
     >
       <style>{scopedCSS}</style>

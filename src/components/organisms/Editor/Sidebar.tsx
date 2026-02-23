@@ -47,9 +47,9 @@ export function EditorSidebar() {
   const history = useEditorStore((state) => state.history);
 
   return (
-    <div className="w-72 bg-slate-50 border-r border-slate-200 flex flex-col h-full">
-      <div className="p-4 border-b border-slate-200">
-        <h2 className="font-semibold text-slate-900">Email Elements</h2>
+    <div className="w-72 bg-card border-r border-border flex flex-col h-full">
+      <div className="p-4 border-b border-border">
+        <h2 className="font-semibold text-foreground">Email Elements</h2>
         <p className="text-xs text-slate-500 mt-1">Drag and drop to add to your email.</p>
       </div>
       
@@ -59,7 +59,7 @@ export function EditorSidebar() {
         ))}
       </div>
 
-      <div className="p-4 border-t border-slate-200 bg-white flex justify-between">
+      <div className="p-4 border-t border-border bg-card flex justify-between">
         <Button 
           variant="outline" 
           size="sm" 
