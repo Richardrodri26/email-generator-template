@@ -210,10 +210,11 @@ export default function EditorPage() {
 
     if (isNew) {
       const type = active.data.current?.type as EditorNodeType;
+      const presetProps = active.data.current?.presetProps;
       addNode(parentId, {
         id: uuidv4(),
         type,
-        props: getDefaultProps(type),
+        props: presetProps ?? getDefaultProps(type),
         children: [],
       }, insertIndex);
     } else {
