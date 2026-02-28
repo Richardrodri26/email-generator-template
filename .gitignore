@@ -43,3 +43,5 @@ next-env.d.ts
 # worktrees
 /.worktrees/
 /worktrees/
+
+bash.exe*

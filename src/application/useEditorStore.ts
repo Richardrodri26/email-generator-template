@@ -14,7 +14,7 @@ interface EditorState {
   selectNode: (id: string | null) => void;
   addNode: (parentId: string, node: EditorNode, index?: number) => void;
   moveNode: (id: string, newParentId: string, newIndex: number) => void;
-  reorderNode: (parentId: string, activeId: string, overId: string) => void;
+  reorderNode: (parentId: string, activeId: string, overId: string, insertBefore?: boolean) => void;
   updateNodeProps: (id: string, props: Record<string, any>) => void;
   removeNode: (id: string) => void;
   undo: () => void;
@@ -107,23 +107,32 @@ export const useEditorStore = create<EditorState>()(
         state.historyIndex++;
       }),
 
-    reorderNode: (parentId, activeId, overId) =>
+    reorderNode: (parentId, activeId, overId, insertBefore = true) =>
       set((state) => {
         const parent = state.data.nodes[parentId];
         if (!parent) return;
 
         const oldIndex = parent.children.indexOf(activeId);
-        const newIndex = parent.children.indexOf(overId);
+        const overIndex = parent.children.indexOf(overId);
 
-        if (oldIndex !== -1 && newIndex !== -1) {
-          parent.children = arrayMove(parent.children, oldIndex, newIndex);
+        if (oldIndex === -1 || overIndex === -1 || oldIndex === overIndex) return;
 
-          // Save to history
-          const currentData = JSON.parse(JSON.stringify(state.data));
-          state.history = state.history.slice(0, state.historyIndex + 1);
-          state.history.push(currentData);
-          state.historyIndex++;
-        }
+        // Remove active from current position
+        const next = [...parent.children];
+        next.splice(oldIndex, 1);
+
+        // Find over's new index after removal, then insert before or after
+        const newOverIndex = next.indexOf(overId);
+        const insertAt = insertBefore ? newOverIndex : newOverIndex + 1;
+        next.splice(insertAt, 0, activeId);
+
+        parent.children = next;
+
+        // Save to history
+        const currentData = JSON.parse(JSON.stringify(state.data));
+        state.history = state.history.slice(0, state.historyIndex + 1);
+        state.history.push(currentData);
+        state.historyIndex++;
       }),
 
     updateNodeProps: (id, props) =>

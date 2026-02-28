@@ -3,7 +3,7 @@
 import { useEditorStore } from "@/application/useEditorStore";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Undo2, Redo2 } from "lucide-react";
+import { Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Undo2, Redo2, Tag, BarChart2 } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 
 const BLOCKS = [
@@ -17,6 +17,8 @@ const BLOCKS = [
   { type: "SOCIAL", label: "Social", icon: Share2 },
   { type: "CARD", label: "Card", icon: PanelTop },
   { type: "TABLE", label: "Table", icon: Table2 },
+  { type: "BADGE", label: "Badge", icon: Tag },
+  { type: "CHART", label: "Chart", icon: BarChart2 },
 ];
 
 function DraggableBlock({ type, label, icon: Icon }: any) {

@@ -1,11 +1,68 @@
 "use client";
 
+import { useState } from "react";
 import { useEditorStore } from "@/application/useEditorStore";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, BarChart2, TrendingUp, PieChart, Plus, Link2, Link2Off } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface SpacingControlProps {
+  label: string;
+  topKey: string;
+  rightKey: string;
+  bottomKey: string;
+  leftKey: string;
+  style: Record<string, any>;
+  onChange: (key: string, value: string) => void;
+  onBatchChange: (updates: Record<string, string>) => void;
+}
+
+function SpacingControl({ label, topKey, rightKey, bottomKey, leftKey, style, onChange, onBatchChange }: SpacingControlProps) {
+  const [linked, setLinked] = useState(true);
+
+  const handleChange = (key: string, value: string) => {
+    if (linked) {
+      onBatchChange({ [topKey]: value, [rightKey]: value, [bottomKey]: value, [leftKey]: value });
+    } else {
+      onChange(key, value);
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        <button
+          onClick={() => setLinked(!linked)}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          title={linked ? "Unlink sides" : "Link sides"}
+        >
+          {linked ? <Link2 className="h-3.5 w-3.5" /> : <Link2Off className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <div>
+          <Label className="text-[10px] text-muted-foreground mb-0.5 block">Top</Label>
+          <Input value={style[topKey] || "0px"} onChange={(e) => handleChange(topKey, e.target.value)} placeholder="0px" className="h-7 text-xs" />
+        </div>
+        <div>
+          <Label className="text-[10px] text-muted-foreground mb-0.5 block">Right</Label>
+          <Input value={style[rightKey] || "0px"} onChange={(e) => handleChange(rightKey, e.target.value)} placeholder="0px" className="h-7 text-xs" />
+        </div>
+        <div>
+          <Label className="text-[10px] text-muted-foreground mb-0.5 block">Bottom</Label>
+          <Input value={style[bottomKey] || "0px"} onChange={(e) => handleChange(bottomKey, e.target.value)} placeholder="0px" className="h-7 text-xs" />
+        </div>
+        <div>
+          <Label className="text-[10px] text-muted-foreground mb-0.5 block">Left</Label>
+          <Input value={style[leftKey] || "0px"} onChange={(e) => handleChange(leftKey, e.target.value)} placeholder="0px" className="h-7 text-xs" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function EditorPropertiesPanel() {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
@@ -30,6 +87,10 @@ export function EditorPropertiesPanel() {
   const handleStyleChange = (key: string, value: any) => {
     const newStyle = { ...node.props.style, [key]: value };
     updateNodeProps(selectedNodeId, { style: newStyle });
+  };
+
+  const handleBatchStyleChange = (updates: Record<string, string>) => {
+    updateNodeProps(selectedNodeId, { style: { ...node.props.style, ...updates } });
   };
 
   return (
@@ -69,16 +130,29 @@ export function EditorPropertiesPanel() {
                 <option value="8.3333%">1/12</option>
               </select>
             </div>
-            {node.props.style?.height && (
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Height</Label>
-                <Input
-                  value={node.props.style?.height || "auto"}
-                  onChange={(e) => handleStyleChange("height", e.target.value)}
-                  placeholder="e.g. 200px"
-                />
-              </div>
-            )}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Height</Label>
+              <Input
+                value={node.props.style?.height || "auto"}
+                onChange={(e) => handleStyleChange("height", e.target.value)}
+                placeholder="auto"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">auto = shrink to content</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Spacing (all non-ROOT, non-CONTAINER) ── */}
+        {node.type !== "ROOT" && node.type !== "CONTAINER" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Spacing</h3>
+            <SpacingControl
+              label="Padding"
+              topKey="paddingTop" rightKey="paddingRight" bottomKey="paddingBottom" leftKey="paddingLeft"
+              style={node.props.style || {}}
+              onChange={handleStyleChange}
+              onBatchChange={handleBatchStyleChange}
+            />
           </div>
         )}
 
@@ -298,38 +372,80 @@ export function EditorPropertiesPanel() {
 
         {/* ── TABLE ── */}
         {node.type === "TABLE" && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Table</h3>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Headers (comma-separated)</Label>
-              <Input
-                value={(node.props.headers || []).join(", ")}
-                onChange={(e) =>
-                  handleChange(
-                    "headers",
-                    e.target.value.split(",").map((s: string) => s.trim()),
-                  )
-                }
-                placeholder="Col 1, Col 2, Col 3"
-              />
-            </div>
+
+            {/* Headers */}
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground mb-1 block">Rows</Label>
-              {(node.props.rows || []).map((row: string[], ri: number) => (
-                <div key={ri} className="flex gap-1 items-center">
+              <Label className="text-xs text-muted-foreground block">Headers</Label>
+              {(node.props.headers || []).map((h: string, hi: number) => (
+                <div key={hi} className="flex gap-1 items-center">
                   <Input
-                    value={row.join(", ")}
+                    value={h}
                     onChange={(e) => {
-                      const newRows = [...(node.props.rows || [])];
-                      newRows[ri] = e.target.value.split(",").map((s: string) => s.trim());
-                      handleChange("rows", newRows);
+                      const newHeaders = [...(node.props.headers || [])];
+                      newHeaders[hi] = e.target.value;
+                      handleChange("headers", newHeaders);
                     }}
-                    className="flex-1 font-mono text-xs"
+                    className="flex-1 text-xs"
+                    placeholder={`Column ${hi + 1}`}
                   />
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-red-400 hover:text-red-600"
+                    className="h-8 w-8 text-red-400 hover:text-red-600 shrink-0"
+                    onClick={() => {
+                      const newHeaders = (node.props.headers || []).filter((_: string, i: number) => i !== hi);
+                      const newRows = (node.props.rows || []).map((row: string[]) =>
+                        row.filter((_: string, i: number) => i !== hi)
+                      );
+                      handleChange("headers", newHeaders);
+                      handleChange("rows", newRows);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => {
+                  handleChange("headers", [...(node.props.headers || []), `Column ${(node.props.headers || []).length + 1}`]);
+                  const newRows = (node.props.rows || []).map((row: string[]) => [...row, "—"]);
+                  handleChange("rows", newRows);
+                }}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Add Column
+              </Button>
+            </div>
+
+            {/* Rows */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground block">Rows</Label>
+              {(node.props.rows || []).map((row: string[], ri: number) => (
+                <div key={ri} className="flex gap-1 items-start">
+                  <div className="flex-1 grid gap-1" style={{ gridTemplateColumns: `repeat(${(node.props.headers || []).length || 1}, 1fr)` }}>
+                    {row.map((cell: string, ci: number) => (
+                      <Input
+                        key={ci}
+                        value={cell}
+                        onChange={(e) => {
+                          const newRows = (node.props.rows || []).map((r: string[], i: number) =>
+                            i === ri ? r.map((c: string, j: number) => (j === ci ? e.target.value : c)) : r
+                          );
+                          handleChange("rows", newRows);
+                        }}
+                        className="text-xs"
+                        placeholder="—"
+                      />
+                    ))}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-400 hover:text-red-600 shrink-0"
                     onClick={() => {
                       const newRows = (node.props.rows || []).filter((_: string[], i: number) => i !== ri);
                       handleChange("rows", newRows);
@@ -345,11 +461,164 @@ export function EditorPropertiesPanel() {
                 className="w-full text-xs"
                 onClick={() => {
                   const colCount = (node.props.headers || []).length || 3;
-                  const newRow = Array(colCount).fill("—");
-                  handleChange("rows", [...(node.props.rows || []), newRow]);
+                  handleChange("rows", [...(node.props.rows || []), Array(colCount).fill("—")]);
                 }}
               >
-                + Add Row
+                <Plus className="h-3 w-3 mr-1" /> Add Row
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── BADGE ── */}
+        {node.type === "BADGE" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Badge</h3>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Text</Label>
+              <Input
+                value={node.props.content || ""}
+                onChange={(e) => handleChange("content", e.target.value)}
+                placeholder="Badge text..."
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Variant</Label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(["default", "secondary", "outline", "destructive"] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => handleChange("variant", v)}
+                    className={cn(
+                      "h-8 rounded-md border text-xs font-medium capitalize transition-colors",
+                      (node.props.variant || "default") === v
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-input bg-transparent text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── CHART ── */}
+        {node.type === "CHART" && (
+          <div className="space-y-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Chart</h3>
+
+            {/* Chart type */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Type</Label>
+              <div className="flex gap-1.5">
+                {([
+                  { value: "bar", icon: BarChart2, label: "Bar" },
+                  { value: "line", icon: TrendingUp, label: "Line" },
+                  { value: "pie", icon: PieChart, label: "Pie" },
+                ] as const).map(({ value, icon: Icon, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => handleChange("chartType", value)}
+                    className={cn(
+                      "flex-1 h-10 rounded-md border text-xs font-medium flex flex-col items-center justify-center gap-0.5 transition-colors",
+                      (node.props.chartType || "bar") === value
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-input bg-transparent text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Title */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Title</Label>
+              <Input
+                value={node.props.chartTitle || ""}
+                onChange={(e) => handleChange("chartTitle", e.target.value)}
+                placeholder="Chart title..."
+              />
+            </div>
+
+            {/* Colors */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Colors</Label>
+              <div className="flex gap-1 flex-wrap">
+                {(node.props.colors || ["#f97316", "#60a5fa", "#34d399", "#f59e0b"]).map((color: string, ci: number) => (
+                  <input
+                    key={ci}
+                    type="color"
+                    value={color.startsWith("var(") ? "#f97316" : color}
+                    onChange={(e) => {
+                      const newColors = [...(node.props.colors || [])];
+                      newColors[ci] = e.target.value;
+                      handleChange("colors", newColors);
+                    }}
+                    className="w-8 h-8 rounded cursor-pointer border border-input p-0.5"
+                    title={`Color ${ci + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Data points */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground block">Data</Label>
+              <div className="grid grid-cols-[1fr_80px_32px] gap-1 text-[10px] text-muted-foreground px-0.5">
+                <span>Label</span><span>Value</span><span />
+              </div>
+              {(node.props.data || []).map((point: { name: string; value: number }, di: number) => (
+                <div key={di} className="grid grid-cols-[1fr_80px_32px] gap-1 items-center">
+                  <Input
+                    value={point.name}
+                    onChange={(e) => {
+                      const newData = (node.props.data || []).map((p: { name: string; value: number }, i: number) =>
+                        i === di ? { ...p, name: e.target.value } : p
+                      );
+                      handleChange("data", newData);
+                    }}
+                    className="text-xs"
+                    placeholder="Label"
+                  />
+                  <Input
+                    type="number"
+                    value={point.value}
+                    onChange={(e) => {
+                      const newData = (node.props.data || []).map((p: { name: string; value: number }, i: number) =>
+                        i === di ? { ...p, value: Number(e.target.value) } : p
+                      );
+                      handleChange("data", newData);
+                    }}
+                    className="text-xs"
+                    placeholder="0"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-400 hover:text-red-600"
+                    onClick={() => {
+                      const newData = (node.props.data || []).filter((_: any, i: number) => i !== di);
+                      handleChange("data", newData);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => {
+                  handleChange("data", [...(node.props.data || []), { name: "New", value: 0 }]);
+                }}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Add Data Point
               </Button>
             </div>
           </div>
@@ -376,14 +645,26 @@ export function EditorPropertiesPanel() {
                 />
               </div>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Padding</Label>
-              <Input
-                value={node.props.style?.padding || "0px"}
-                onChange={(e) => handleStyleChange("padding", e.target.value)}
-                placeholder="e.g. 20px"
-              />
-            </div>
+            {node.type === "CONTAINER" ? (
+              <>
+                <SpacingControl
+                  label="Padding"
+                  topKey="paddingTop" rightKey="paddingRight" bottomKey="paddingBottom" leftKey="paddingLeft"
+                  style={node.props.style || {}}
+                  onChange={handleStyleChange}
+                  onBatchChange={handleBatchStyleChange}
+                />
+              </>
+            ) : (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Padding</Label>
+                <Input
+                  value={node.props.style?.padding || "0px"}
+                  onChange={(e) => handleStyleChange("padding", e.target.value)}
+                  placeholder="e.g. 20px"
+                />
+              </div>
+            )}
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">Border Radius</Label>
               <select

@@ -6,6 +6,7 @@ import { useAuth } from "@/application/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,7 @@ export function Navbar() {
         </Link>
         
         <div className="flex items-center gap-4">
+          <ThemeToggle />
           {!isLoading && !user ? (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, createContext, useContext, Fragment } from "react";
 import { useEditorStore } from "@/application/useEditorStore";
 import {
   useSortable,
@@ -9,10 +9,63 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+
+// ─── Drag State Context ───────────────────────────────────────────────
+interface DragState {
+  overNodeId: string | null;
+  dropAbove: boolean;
+  activeDragId: string | null;
+}
+
+export const EditorDragContext = createContext<DragState>({
+  overNodeId: null,
+  dropAbove: true,
+  activeDragId: null,
+});
+
+// ─── Drop Indicator ───────────────────────────────────────────────────
+function DropIndicator() {
+  return (
+    <div
+      data-testid="drop-indicator"
+      className="pointer-events-none relative h-0.5 bg-primary rounded-full mx-1 my-0.5 z-30"
+    >
+      <div className="absolute -left-1 -top-[5px] w-3 h-3 rounded-full bg-primary border-2 border-background shadow" />
+    </div>
+  );
+}
 import { Plus, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from "recharts";
 
 // ─── 12-Column Grid Helpers ──────────────────────────────────────────
 const GRID_COLS = 12;
@@ -29,6 +82,27 @@ function colLabel(width?: string): string | null {
   const pct = parseFloat(width);
   const cols = Math.round((pct / 100) * GRID_COLS);
   return `${cols}/${GRID_COLS}`;
+}
+
+// ─── Container Children with Drop Indicators ─────────────────────────
+function ContainerChildren({ childIds, nodeId: _parentId }: { childIds: string[]; nodeId: string }) {
+  const { overNodeId, dropAbove, activeDragId } = useContext(EditorDragContext);
+
+  return (
+    <>
+      {childIds.map((cid) => {
+        const isActive = cid === activeDragId;
+        const isOver = cid === overNodeId && !isActive;
+        return (
+          <Fragment key={cid}>
+            {isOver && dropAbove && <DropIndicator />}
+            <NodeRenderer nodeId={cid} />
+            {isOver && !dropAbove && <DropIndicator />}
+          </Fragment>
+        );
+      })}
+    </>
+  );
 }
 
 // ─── Node Renderer ───────────────────────────────────────────────────
@@ -135,6 +209,13 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
 
   const widthLabel = colLabel(merged.width);
 
+  // ── Per-type border-radius class (so ring follows node shape) ────
+  const nodeRoundedClass =
+    node.type === "BUTTON" ? "rounded-md" :
+    node.type === "CARD" ? "rounded-xl" :
+    node.type === "IMAGE" ? "rounded-[var(--radius)]" :
+    "";
+
   // ── Wrapper ────
   const wrapWithSelection = (children: React.ReactNode) => (
     <div
@@ -143,6 +224,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       onClick={handleClick}
       className={[
         "relative group/node transition-shadow",
+        nodeRoundedClass,
         isSelected
           ? "ring-2 ring-primary ring-offset-2 z-10"
           : "hover:ring-1 hover:ring-muted-foreground/30",
@@ -150,18 +232,16 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
           ? "outline-2 outline-dashed outline-primary bg-primary/5"
           : "",
         node.type === "ROOT"
-          ? "flex flex-col min-h-full w-full"
+          ? "flex flex-col flex-1 w-full"
           : "",
       ].join(" ")}
       style={{
         ...merged,
         ...draggingStyle,
         minHeight:
-          node.type === "ROOT"
-            ? "100%"
-            : isContainer && node.children.length === 0
-              ? "60px"
-              : undefined,
+          isContainer && node.children.length === 0
+            ? "60px"
+            : undefined,
         position: "relative",
       }}
       {...(node.type !== "ROOT" ? attributes : {})}
@@ -325,9 +405,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
               ...merged,
             }}
           >
-            {node.children.map((cid) => (
-              <NodeRenderer key={cid} nodeId={cid} />
-            ))}
+            <ContainerChildren nodeId={nodeId} childIds={node.children} />
           </div>
         </SortableContext>,
       );
@@ -365,41 +443,26 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     }
 
     /* ── Card (shadcn card) ── */
-    case "CARD":
+    case "CARD": {
+      const customCardBg = merged.backgroundColor ?? undefined;
       return wrapWithSelection(
-        <SortableContext
-          items={node.children}
-          strategy={verticalListSortingStrategy}
-        >
-          <div
-            style={{ width: "100%", ...merged }}
-            className="flex flex-col gap-2 bg-card text-card-foreground shadow-sm border border-border rounded-lg overflow-hidden"
-          >
-            {node.props.cardTitle && (
-              <div className="px-6 pt-6 pb-0">
-                <h3 className="text-base font-semibold leading-none tracking-tight">
-                  {node.props.cardTitle}
-                </h3>
+        <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
+          <Card style={{ width: "100%", backgroundColor: customCardBg }}>
+            {(node.props.cardTitle || node.props.cardDescription) && (
+              <CardHeader>
+                {node.props.cardTitle && <CardTitle>{node.props.cardTitle}</CardTitle>}
                 {node.props.cardDescription && (
-                  <p className="text-sm text-muted-foreground mt-1.5">
-                    {node.props.cardDescription}
-                  </p>
+                  <CardDescription>{node.props.cardDescription}</CardDescription>
                 )}
-              </div>
+              </CardHeader>
             )}
-            <div className="px-6 py-4 flex flex-col gap-2">
-              {node.children.map((cid) => (
-                <NodeRenderer key={cid} nodeId={cid} />
-              ))}
-              {node.children.length === 0 && (
-                <div className="text-muted-foreground text-sm py-4 w-full text-center">
-                  Add content to card
-                </div>
-              )}
-            </div>
-          </div>
+            <CardContent>
+              <ContainerChildren nodeId={nodeId} childIds={node.children} />
+            </CardContent>
+          </Card>
         </SortableContext>,
       );
+    }
 
     /* ── Table (shadcn table) ── */
     case "TABLE": {
@@ -409,39 +472,116 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
         ["Cell 4", "Cell 5", "Cell 6"],
       ];
       return wrapWithSelection(
-        <div
-          className="w-full overflow-x-auto rounded-md border border-border"
-          style={merged}
-        >
-          <table className="w-full caption-bottom text-sm">
-            <thead className="border-b border-border bg-muted/50">
-              <tr>
+        <div className="rounded-md border w-full">
+          <Table>
+            <TableHeader>
+              <TableRow>
                 {headers.map((h: string, i: number) => (
-                  <th
-                    key={i}
-                    className="h-10 px-4 text-left align-middle font-medium text-muted-foreground"
-                  >
-                    {h}
-                  </th>
+                  <TableHead key={i}>{h}</TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {rows.map((row: string[], ri: number) => (
-                <tr
-                  key={ri}
-                  className="border-b border-border transition-colors hover:bg-muted/50"
-                >
+                <TableRow key={ri}>
                   {row.map((cell: string, ci: number) => (
-                    <td key={ci} className="p-4 align-middle">
-                      {cell}
-                    </td>
+                    <TableCell key={ci}>{cell}</TableCell>
                   ))}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>,
+      );
+    }
+
+    /* ── Badge ── */
+    case "BADGE": {
+      const variantMap: Record<string, string> = {
+        default: "bg-primary text-primary-foreground",
+        secondary: "bg-secondary text-secondary-foreground",
+        outline: "border border-input text-foreground",
+        destructive: "bg-destructive text-white",
+      };
+      const v = node.props.variant || "default";
+      return wrapWithSelection(
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+            variantMap[v] || variantMap.default
+          )}
+          style={node.props.style}
+        >
+          {node.props.content || "Badge"}
+        </span>
+      );
+    }
+
+    /* ── Chart ── */
+    case "CHART": {
+      const chartData = node.props.data || [
+        { name: "A", value: 4000 },
+        { name: "B", value: 3000 },
+        { name: "C", value: 5000 },
+      ];
+      const colors = node.props.colors || ["#f97316", "#60a5fa", "#34d399", "#f59e0b"];
+      const chartType = node.props.chartType || "bar";
+
+      const chartStyle = {
+        width: "100%",
+        height: 260,
+        ...node.props.style,
+      };
+
+      let chartEl: React.ReactNode;
+      if (chartType === "line") {
+        chartEl = (
+          <ResponsiveContainer width="100%" height={chartStyle.height as number}>
+            <LineChart data={chartData}>
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="value" stroke={colors[0]} strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        );
+      } else if (chartType === "pie") {
+        chartEl = (
+          <ResponsiveContainer width="100%" height={chartStyle.height as number}>
+            <PieChart>
+              <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                {chartData.map((_: any, i: number) => (
+                  <Cell key={i} fill={colors[i % colors.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        );
+      } else {
+        chartEl = (
+          <ResponsiveContainer width="100%" height={chartStyle.height as number}>
+            <BarChart data={chartData}>
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Bar dataKey="value">
+                {chartData.map((_: any, i: number) => (
+                  <Cell key={i} fill={colors[i % colors.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      }
+
+      return wrapWithSelection(
+        <div style={{ width: "100%", padding: "8px 0" }}>
+          {node.props.chartTitle && (
+            <p className="text-sm font-semibold text-foreground mb-2 px-1">{node.props.chartTitle}</p>
+          )}
+          {chartEl}
+        </div>
       );
     }
 
@@ -453,9 +593,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
           items={node.children}
           strategy={verticalListSortingStrategy}
         >
-          {node.children.map((cid) => (
-            <NodeRenderer key={cid} nodeId={cid} />
-          ))}
+          <ContainerChildren nodeId={nodeId} childIds={node.children} />
         </SortableContext>,
       );
 
@@ -465,7 +603,14 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
 }
 
 // ─── Canvas Shell ────────────────────────────────────────────────────
-export function EditorCanvas({ themeCSS }: { themeCSS?: string }) {
+interface EditorCanvasProps {
+  themeCSS?: string;
+  overNodeId?: string | null;
+  dropAbove?: boolean;
+  activeDragId?: string | null;
+}
+
+export function EditorCanvas({ themeCSS, overNodeId = null, dropAbove = true, activeDragId = null }: EditorCanvasProps) {
   const rootNodeId = useEditorStore((s) => s.data.rootNodeId);
   const selectNode = useEditorStore((s) => s.selectNode);
 
@@ -476,31 +621,33 @@ export function EditorCanvas({ themeCSS }: { themeCSS?: string }) {
     : "";
 
   return (
-    <div
-      className="flex-1 bg-muted/40 overflow-y-auto p-8 flex justify-center items-start"
-      onClick={() => selectNode(null)}
-    >
-      <style>{scopedCSS}</style>
+    <EditorDragContext.Provider value={{ overNodeId, dropAbove, activeDragId }}>
+      <div
+        className="flex-1 bg-muted/40 overflow-y-auto p-8 flex justify-center items-start"
+        onClick={() => selectNode(null)}
+      >
+        <style>{scopedCSS}</style>
 
-      {/* 12-col grid overlay guide (visible only while hovering canvas) */}
-      <div className="w-full max-w-150 min-h-200 bg-background shadow-xl rounded-sm email-editor-preview flex flex-col relative group/canvas">
-        {/* Grid guide lines */}
-        <div className="absolute inset-0 pointer-events-none opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-300 z-0">
-          <div className="h-full w-full flex">
-            {Array.from({ length: GRID_COLS }).map((_, i) => (
-              <div
-                key={i}
-                className="flex-1 border-r border-primary/4 last:border-r-0"
-              />
-            ))}
+        {/* 12-col grid overlay guide (visible only while hovering canvas) */}
+        <div className="w-full max-w-150 min-h-200 bg-background shadow-xl rounded-sm email-editor-preview flex flex-col relative group/canvas">
+          {/* Grid guide lines */}
+          <div className="absolute inset-0 pointer-events-none opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-300 z-0">
+            <div className="h-full w-full flex">
+              {Array.from({ length: GRID_COLS }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex-1 border-r border-primary/4 last:border-r-0"
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Actual content */}
+          <div className="relative z-1 flex-1 flex flex-col">
+            <NodeRenderer nodeId={rootNodeId} />
           </div>
         </div>
-
-        {/* Actual content */}
-        <div className="relative z-1 flex-1 flex flex-col">
-          <NodeRenderer nodeId={rootNodeId} />
-        </div>
       </div>
-    </div>
+    </EditorDragContext.Provider>
   );
 }

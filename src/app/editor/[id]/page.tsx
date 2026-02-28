@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/application/useAuth";
 import { useTemplates } from "@/application/useTemplates";
 import { useEditorStore } from "@/application/useEditorStore";
-import { DndContext, DragEndEvent, closestCenter, DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverEvent, closestCenter, DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { EditorSidebar } from "@/components/organisms/Editor/Sidebar";
 import { EditorCanvas } from "@/components/organisms/Editor/Canvas";
 import { EditorPropertiesPanel } from "@/components/organisms/Editor/PropertiesPanel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop } from "lucide-react";
+import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Tag, BarChart2 } from "lucide-react";
 import { LocalStorageTemplateRepository } from "@/infrastructure/repositories/LocalStorageTemplateRepository";
 import { v4 as uuidv4 } from "uuid";
 import Link from "next/link";
@@ -31,6 +31,8 @@ const NODE_ICONS: Record<string, React.ElementType> = {
   SOCIAL: Share2,
   CARD: PanelTop,
   TABLE: Table2,
+  BADGE: Tag,
+  CHART: BarChart2,
 };
 
 export default function EditorPage() {
@@ -44,7 +46,12 @@ export default function EditorPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [activeDragType, setActiveDragType] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [overNodeId, setOverNodeId] = useState<string | null>(null);
+  const overNodeIdRef = useRef<string | null>(null);
+  const [dropAbove, setDropAbove] = useState(true);
+  const dropAboveRef = useRef(true);
   const [themeCSS, setThemeCSS] = useState("");
+  const mouseYRef = useRef(0);
 
   // Editor Store actions
   const initialize = useEditorStore((state) => state.initialize);
@@ -59,7 +66,7 @@ export default function EditorPage() {
     })
   );
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts + mouse tracking
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const ctrl = navigator.platform.includes("Mac") ? e.metaKey : e.ctrlKey;
@@ -73,8 +80,26 @@ export default function EditorPage() {
         useEditorStore.getState().redo();
       }
     };
+    const handlePointerMove = (e: PointerEvent) => {
+      mouseYRef.current = e.clientY;
+      // Update visual indicator in real time when over a node
+      const currentOver = overNodeIdRef.current;
+      if (!currentOver) return;
+      const overEl = document.getElementById(`node-${currentOver}`);
+      if (!overEl) return;
+      const rect = overEl.getBoundingClientRect();
+      const above = e.clientY < rect.top + rect.height / 2;
+      if (above !== dropAboveRef.current) {
+        dropAboveRef.current = above;
+        setDropAbove(above);
+      }
+    };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("pointermove", handlePointerMove);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("pointermove", handlePointerMove);
+    };
   }, []);
 
   // Load Template
@@ -99,42 +124,85 @@ export default function EditorPage() {
     );
   }
 
+  const CONTAINER_TYPES = new Set(["ROOT", "CONTAINER", "COLUMNS", "CARD"]);
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const isNew = active.data.current?.isNew;
     setActiveDragId(active.id as string);
+    overNodeIdRef.current = null;
+    setOverNodeId(null);
+    dropAboveRef.current = true;
     if (isNew) {
       setActiveDragType(active.data.current?.type);
     } else {
-      // Existing node being dragged
       const draggedNode = currentData?.nodes[active.id as string];
       setActiveDragType(draggedNode?.type || null);
+    }
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (!over) {
+      setOverNodeId(null);
+      return;
+    }
+
+    const overId = over.id as string;
+    const overNode = currentData?.nodes[overId];
+
+    // Don't show indicator when hovering a container (drop goes inside it)
+    if (!overNode || CONTAINER_TYPES.has(overNode.type)) {
+      overNodeIdRef.current = null;
+      setOverNodeId(null);
+      return;
+    }
+
+    overNodeIdRef.current = overId;
+    setOverNodeId(overId);
+
+    const overEl = document.getElementById(`node-${overId}`);
+    if (overEl) {
+      const rect = overEl.getBoundingClientRect();
+      const above = mouseYRef.current < rect.top + rect.height / 2;
+      dropAboveRef.current = above;
+      setDropAbove(above);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveDragType(null);
     setActiveDragId(null);
+    overNodeIdRef.current = null;
+    setOverNodeId(null);
+
     const { active, over } = event;
-    
     if (!over) return;
-    
+
     const isNew = active.data.current?.isNew;
     const overId = over.id as string;
     const overNode = currentData?.nodes[overId];
-    // Determine the actual parent. If we are dragging over a container, the parent is the container. If we are dragging over an item, the parent is the item's parent.
-    const isOverContainer = overNode?.type === "ROOT" || overNode?.type === "CONTAINER" || overNode?.type === "COLUMNS" || overNode?.type === "CARD";
-    
+    const isOverContainer = overNode ? CONTAINER_TYPES.has(overNode.type) : false;
+
+    // Compute dropAbove fresh at drop time — avoids onDragOver timing gap (onDragOver only fires on target change)
+    let capturedDropAbove = true;
+    if (!isOverContainer) {
+      const overEl = document.getElementById(`node-${overId}`);
+      if (overEl) {
+        const rect = overEl.getBoundingClientRect();
+        capturedDropAbove = mouseYRef.current < rect.top + rect.height / 2;
+      }
+    }
+
     let parentId = overId;
-    let insertIndex = undefined;
+    let insertIndex: number | undefined;
 
     if (!isOverContainer) {
-      // Find parent of the over node
       for (const [nodeId, node] of Object.entries(currentData!.nodes)) {
         const idx = node.children.indexOf(overId);
         if (idx !== -1) {
           parentId = nodeId;
-          insertIndex = idx;
+          insertIndex = capturedDropAbove ? idx : idx + 1;
           break;
         }
       }
@@ -142,30 +210,24 @@ export default function EditorPage() {
 
     if (isNew) {
       const type = active.data.current?.type as EditorNodeType;
-      // Add new node
-      const newNodeId = uuidv4();
       addNode(parentId, {
-        id: newNodeId,
+        id: uuidv4(),
         type,
         props: getDefaultProps(type),
-        children: []
+        children: [],
       }, insertIndex);
     } else {
-      // It's an existing node
       if (active.id !== over.id) {
-        if (parentId === overId && isOverContainer) {
-          // Moved into a new container
+        if (isOverContainer) {
+          // Drop directly into container
           moveNode(active.id as string, parentId, 0);
         } else {
-          // Sort/Reorder within the same parent or moving to a specific index in a different parent
-          // To keep it robust, let's check if they belong to the same parent first
-          const activeParentId = Object.keys(currentData!.nodes).find(key => currentData!.nodes[key].children.includes(active.id as string));
-          
+          const activeParentId = Object.keys(currentData!.nodes).find(
+            (key) => currentData!.nodes[key].children.includes(active.id as string)
+          );
           if (activeParentId === parentId) {
-            // Reorder inside the same sequence
-            reorderNode(parentId, active.id as string, over.id as string);
+            reorderNode(parentId, active.id as string, over.id as string, capturedDropAbove);
           } else {
-            // Move across containers
             moveNode(active.id as string, parentId, insertIndex ?? 0);
           }
         }
@@ -257,11 +319,17 @@ export default function EditorPage() {
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         <div className="flex-1 flex overflow-hidden">
           <EditorSidebar />
-          <EditorCanvas themeCSS={themeCSS} />
+          <EditorCanvas
+            themeCSS={themeCSS}
+            overNodeId={overNodeId}
+            dropAbove={dropAbove}
+            activeDragId={activeDragId}
+          />
           <EditorPropertiesPanel />
         </div>
 
@@ -286,11 +354,11 @@ function getDefaultProps(type: EditorNodeType) {
     case 'TEXT': return { content: 'Add your text here...', style: { color: 'var(--foreground)', fontSize: '16px', fontWeight: '400', lineHeight: '1.6', textAlign: 'left' } };
     case 'BUTTON': return { content: 'Click Here', href: '#', style: { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' } };
     case 'IMAGE': return { src: 'https://placehold.co/600x400', alt: 'Placeholder', style: { width: '100%', borderRadius: 'var(--radius)' } };
-    case 'CONTAINER': return { style: { padding: '20px', backgroundColor: 'transparent' } };
+    case 'CONTAINER': return { style: { paddingTop: '20px', paddingRight: '20px', paddingBottom: '20px', paddingLeft: '20px', backgroundColor: 'transparent' } };
     case 'DIVIDER': return { style: { width: '100%' } };
     case 'SPACER': return { height: '40px', style: {} };
     case 'COLUMNS': return { style: { display: 'flex', gap: '20px', flexDirection: 'row', width: '100%' } };
-    case 'SOCIAL': return { style: { display: 'flex', gap: '10px', justifyContent: 'center', padding: '10px' } };
+    case 'SOCIAL': return { style: { display: 'flex', gap: '10px', justifyContent: 'center', paddingTop: '10px', paddingRight: '10px', paddingBottom: '10px', paddingLeft: '10px' } };
     case 'CARD': return { cardTitle: 'Card Title', cardDescription: 'Short description here', style: { width: '100%' } };
     case 'TABLE': return {
       headers: ['Name', 'Status', 'Amount'],
@@ -298,6 +366,23 @@ function getDefaultProps(type: EditorNodeType) {
         ['Project Alpha', 'Active', '$2,500'],
         ['Project Beta', 'Pending', '$1,200'],
       ],
+      style: { width: '100%' },
+    };
+    case 'BADGE': return {
+      content: 'New',
+      variant: 'default',
+      style: {},
+    };
+    case 'CHART': return {
+      chartType: 'bar',
+      chartTitle: 'Monthly Sales',
+      data: [
+        { name: 'Jan', value: 4000 },
+        { name: 'Feb', value: 3000 },
+        { name: 'Mar', value: 5000 },
+        { name: 'Apr', value: 4500 },
+      ],
+      colors: ['#f97316', '#60a5fa', '#34d399', '#f59e0b'],
       style: { width: '100%' },
     };
     default: return {};

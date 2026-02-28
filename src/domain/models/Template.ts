@@ -9,7 +9,9 @@ export type EditorNodeType =
   | "COLUMNS"
   | "SOCIAL"
   | "CARD"
-  | "TABLE";
+  | "TABLE"
+  | "BADGE"
+  | "CHART";
 
 export interface EditorNode {
   id: string;
