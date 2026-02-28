@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Trash2, BarChart2, TrendingUp, PieChart, Plus, Link2, Link2Off } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 
 interface SpacingControlProps {
   label: string;
@@ -105,6 +106,76 @@ export function EditorPropertiesPanel() {
       </div>
 
       <div className="p-4 flex-1 overflow-y-auto space-y-6">
+        {/* ── Overlay Mode (all non-ROOT elements) ── */}
+        {node.type !== "ROOT" && (
+          <div className="space-y-3 border-b border-border pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold">Overlay Mode</p>
+                <p className="text-xs text-muted-foreground">Float element over others</p>
+              </div>
+              <Switch
+                checked={node.props.style?.position === "absolute"}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    updateNodeProps(node.id, {
+                      style: {
+                        ...node.props.style,
+                        position: "absolute",
+                        left: "0px",
+                        top: "0px",
+                        zIndex: "10",
+                      },
+                    });
+                  } else {
+                    const newStyle = { ...node.props.style };
+                    delete newStyle.position;
+                    delete newStyle.left;
+                    delete newStyle.top;
+                    delete newStyle.zIndex;
+                    updateNodeProps(node.id, { style: newStyle });
+                  }
+                }}
+              />
+            </div>
+
+            {node.props.style?.position === "absolute" && (
+              <div className="space-y-2 border border-border rounded-md p-3 bg-muted/20">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">X (left)</Label>
+                    <Input
+                      value={node.props.style?.left || "0px"}
+                      onChange={(e) => updateNodeProps(node.id, { style: { ...node.props.style, left: e.target.value } })}
+                      placeholder="0px"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Y (top)</Label>
+                    <Input
+                      value={node.props.style?.top || "0px"}
+                      onChange={(e) => updateNodeProps(node.id, { style: { ...node.props.style, top: e.target.value } })}
+                      placeholder="0px"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Z-Index</Label>
+                  <Input
+                    type="number"
+                    value={node.props.style?.zIndex || "10"}
+                    onChange={(e) => updateNodeProps(node.id, { style: { ...node.props.style, zIndex: e.target.value } })}
+                    placeholder="10"
+                    className="h-7 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Size / Width (all non-ROOT elements) ── */}
         {node.type !== "ROOT" && (
           <div className="space-y-3">
