@@ -8,6 +8,11 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@/lib/utils";
+import { Plus, ImageIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 // ─── 12-Column Grid Helpers ──────────────────────────────────────────
 const GRID_COLS = 12;
@@ -162,32 +167,45 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       {...(node.type !== "ROOT" ? attributes : {})}
       {...(node.type !== "ROOT" ? listeners : {})}
     >
-      {/* ── Selection chrome ── */}
+      {/* ── Label (visible on hover + selection) ── */}
+      {node.type !== "ROOT" && (
+        <div className={cn(
+          "absolute -top-6 left-0 flex items-center gap-1.5 z-20 pointer-events-none",
+          "opacity-0 group-hover/node:opacity-100 transition-opacity",
+          isSelected && "opacity-100"
+        )}>
+          <span className={cn(
+            "text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-t-md",
+            isSelected
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground border border-border"
+          )}>
+            {node.type}
+          </span>
+          {isSelected && widthLabel && (
+            <span className="bg-muted text-muted-foreground text-[10px] font-mono px-1.5 py-0.5 rounded-sm">
+              {widthLabel}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Resize handles (pill-shaped, visible on selection) ── */}
       {isSelected && node.type !== "ROOT" && (
         <>
-          {/* Label badge */}
-          <div className="absolute -top-6 left-0 flex items-center gap-1.5 z-20 pointer-events-none">
-            <span className="bg-primary text-primary-foreground text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-t-md">
-              {node.type}
-            </span>
-            {widthLabel && (
-              <span className="bg-muted text-muted-foreground text-[10px] font-mono px-1.5 py-0.5 rounded-sm">
-                {widthLabel}
-              </span>
-            )}
-          </div>
-
-          {/* Resize handles */}
+          {/* Right handle — pill vertical */}
           <div
-            className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full cursor-e-resize z-20 shadow border border-background"
+            className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-2.5 h-7 bg-primary rounded-full cursor-e-resize z-20 shadow border-2 border-background"
             onPointerDown={(e) => startResize(e, "h")}
           />
+          {/* Bottom handle — pill horizontal */}
           <div
-            className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 bg-primary rounded-full cursor-s-resize z-20 shadow border border-background"
+            className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-7 h-2.5 bg-primary rounded-full cursor-s-resize z-20 shadow border-2 border-background"
             onPointerDown={(e) => startResize(e, "v")}
           />
+          {/* Corner handle */}
           <div
-            className="absolute -right-1.5 -bottom-1.5 w-3 h-3 bg-primary rounded-full cursor-se-resize z-20 shadow border border-background"
+            className="absolute -right-2 -bottom-2 w-4 h-4 bg-primary rounded-full cursor-se-resize z-20 shadow border-2 border-background"
             onPointerDown={(e) => startResize(e, "both")}
           />
         </>
@@ -197,8 +215,9 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
 
       {/* Empty container placeholder */}
       {isContainer && node.children.length === 0 && (
-        <div className="text-muted-foreground/60 text-sm text-center py-8 w-full flex items-center justify-center font-medium border-2 border-dashed border-muted-foreground/20 rounded-md pointer-events-none select-none">
-          Drop block here
+        <div className="text-muted-foreground/60 text-sm text-center py-10 w-full flex flex-col items-center gap-2 border-2 border-dashed border-muted-foreground/20 rounded-md pointer-events-none select-none">
+          <Plus className="h-5 w-5 text-muted-foreground/30" />
+          <span>Drag a block here</span>
         </div>
       )}
     </div>
@@ -210,41 +229,67 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     case "TEXT":
       return wrapWithSelection(
         <div style={merged} className="text-foreground">
-          {node.props.content || "Empty Text"}
+          {node.props.content || (
+            <span className="italic text-muted-foreground/50 text-sm select-none">
+              Edit text in the properties panel →
+            </span>
+          )}
         </div>,
       );
 
-    /* ── Button (shadcn-like) ── */
-    case "BUTTON":
+    /* ── Button ── */
+    case "BUTTON": {
+      // Only pass inline overrides when the user has set a custom value
+      // (i.e. not the Shadcn CSS-variable defaults). This lets Shadcn's
+      // own Tailwind classes (hover, focus, etc.) work normally.
+      const SHADCN_DEFAULTS = ["var(--primary)", "var(--primary-foreground)"];
+      const customBg = merged.backgroundColor && !SHADCN_DEFAULTS.includes(merged.backgroundColor)
+        ? merged.backgroundColor : undefined;
+      const customColor = merged.color && !SHADCN_DEFAULTS.includes(merged.color)
+        ? merged.color : undefined;
+
       return wrapWithSelection(
-        <a
-          href={node.props.href || "#"}
-          onClick={(e) => e.preventDefault()}
-          style={merged}
-          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3 no-underline transition-colors"
+        <Button
+          style={{
+            backgroundColor: customBg,
+            color: customColor,
+            width: merged.width || undefined,
+          }}
+          className="pointer-events-none"
         >
           {node.props.content || "Button"}
-        </a>,
+        </Button>,
       );
+    }
 
     /* ── Image ── */
-    case "IMAGE":
+    case "IMAGE": {
+      const isPlaceholder =
+        !node.props.src || node.props.src.includes("placehold.co");
       return wrapWithSelection(
-        <img
-          src={node.props.src || "https://placehold.co/600x400?text=Image"}
-          alt={node.props.alt || "Image"}
-          style={{ maxWidth: "100%", display: "block", ...merged }}
-        />,
+        isPlaceholder ? (
+          <div
+            style={{ width: merged.width || "100%" }}
+            className="flex flex-col items-center justify-center gap-3 bg-muted/50 border border-dashed border-border rounded-[var(--radius)] text-muted-foreground py-14"
+          >
+            <ImageIcon className="h-10 w-10 opacity-25" />
+            <span className="text-xs text-muted-foreground/60 select-none">
+              Set an image URL in the properties panel →
+            </span>
+          </div>
+        ) : (
+          <img
+            src={node.props.src}
+            alt={node.props.alt || "Image"}
+            style={{ maxWidth: "100%", display: "block", ...merged }}
+          />
+        ),
       );
+    }
 
-    /* ── Divider (shadcn border token) ── */
+    /* ── Divider ── */
     case "DIVIDER":
-      return wrapWithSelection(
-        <hr
-          className="w-full border-t border-border"
-          style={merged}
-        />,
-      );
+      return wrapWithSelection(<Separator style={merged} />);
 
     /* ── Spacer ── */
     case "SPACER":
@@ -255,7 +300,14 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
             ...merged,
             height: merged.height || node.props.height || "40px",
           }}
-        />,
+          className="relative"
+        >
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/node:opacity-100 pointer-events-none transition-opacity">
+            <Badge variant="outline" className="text-[10px] font-mono tabular-nums">
+              {merged.height || node.props.height || "40px"}
+            </Badge>
+          </div>
+        </div>,
       );
 
     /* ── Columns ── */
@@ -281,28 +333,36 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       );
 
     /* ── Social ── */
-    case "SOCIAL":
+    case "SOCIAL": {
+      const socialLinks = [
+        { label: "f", bg: "#1877F2", title: "Facebook" },
+        { label: "𝕏", bg: "#000000", title: "X (Twitter)" },
+        { label: "in", bg: "#0A66C2", title: "LinkedIn" },
+        { label: "ig", bg: "#E1306C", title: "Instagram" },
+      ];
       return wrapWithSelection(
         <div
           style={{
             display: "flex",
-            gap: "10px",
+            gap: "12px",
             justifyContent: "center",
-            padding: "10px",
+            padding: "12px",
             ...merged,
           }}
         >
-          <div className="bg-[#3b5998] text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">
-            f
-          </div>
-          <div className="bg-[#1da1f2] text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">
-            t
-          </div>
-          <div className="bg-[#2867B2] text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">
-            in
-          </div>
+          {socialLinks.map(({ label, bg, title }) => (
+            <div
+              key={title}
+              title={title}
+              style={{ backgroundColor: bg }}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm ring-1 ring-black/10"
+            >
+              {label}
+            </div>
+          ))}
         </div>,
       );
+    }
 
     /* ── Card (shadcn card) ── */
     case "CARD":

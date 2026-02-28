@@ -61,7 +61,7 @@ export function ThemeInjector({ onThemeChange }: ThemeInjectorProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-2 border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800">
+        <Button variant="outline" size="sm" className="h-8 gap-2 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary">
           <Paintbrush className="h-4 w-4" />
           Theme Variables
         </Button>
@@ -77,7 +77,7 @@ export function ThemeInjector({ onThemeChange }: ThemeInjectorProps) {
           <div className="space-y-2">
             <Label>CSS Variables</Label>
             <textarea 
-              className="w-full h-48 p-3 text-sm font-mono border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-slate-50"
+              className="w-full h-48 p-3 text-sm font-mono border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-muted/50"
               placeholder=":root {&#10;  --background: 222.2 84% 4.9%;&#10;  --foreground: 210 40% 98%;&#10;  --primary: 210 40% 98%;&#10;}"
               value={cssVariables}
               onChange={(e) => setCssVariables(e.target.value)}
@@ -86,7 +86,7 @@ export function ThemeInjector({ onThemeChange }: ThemeInjectorProps) {
           <Button 
             onClick={handleSave} 
             disabled={isSaving} 
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white"
+            className="w-full"
           >
             {isSaving ? "Saving..." : "Apply Theme"}
           </Button>

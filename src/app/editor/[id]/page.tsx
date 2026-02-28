@@ -5,12 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/application/useAuth";
 import { useTemplates } from "@/application/useTemplates";
 import { useEditorStore } from "@/application/useEditorStore";
-import { DndContext, DragEndEvent, closestCenter, DragStartEvent, DragOverlay } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, closestCenter, DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { EditorSidebar } from "@/components/organisms/Editor/Sidebar";
 import { EditorCanvas } from "@/components/organisms/Editor/Canvas";
 import { EditorPropertiesPanel } from "@/components/organisms/Editor/PropertiesPanel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download } from "lucide-react";
+import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop } from "lucide-react";
 import { LocalStorageTemplateRepository } from "@/infrastructure/repositories/LocalStorageTemplateRepository";
 import { v4 as uuidv4 } from "uuid";
 import Link from "next/link";
@@ -20,6 +20,19 @@ import { ThemeInjector } from "@/components/organisms/Editor/ThemeInjector";
 
 const repo = new LocalStorageTemplateRepository();
 
+const NODE_ICONS: Record<string, React.ElementType> = {
+  TEXT: Type,
+  BUTTON: MousePointerClick,
+  IMAGE: ImageIcon,
+  CONTAINER: LayoutTemplate,
+  DIVIDER: Minus,
+  SPACER: Space,
+  COLUMNS: Columns2,
+  SOCIAL: Share2,
+  CARD: PanelTop,
+  TABLE: Table2,
+};
+
 export default function EditorPage() {
   const params = useParams();
   const router = useRouter();
@@ -27,6 +40,7 @@ export default function EditorPage() {
   const { user, isLoading: authLoading } = useAuth();
   
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [activeDragType, setActiveDragType] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -38,6 +52,30 @@ export default function EditorPage() {
   const moveNode = useEditorStore((state) => state.moveNode);
   const reorderNode = useEditorStore((state) => state.reorderNode);
   const currentData = useEditorStore((state) => state.data);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const ctrl = navigator.platform.includes("Mac") ? e.metaKey : e.ctrlKey;
+      if (!ctrl) return;
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        useEditorStore.getState().undo();
+      }
+      if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+        e.preventDefault();
+        useEditorStore.getState().redo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Load Template
   useEffect(() => {
@@ -55,8 +93,8 @@ export default function EditorPage() {
 
   if (authLoading || !currentData) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      <div className="flex h-screen w-full items-center justify-center bg-muted/40">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -143,6 +181,8 @@ export default function EditorPage() {
       await repo.saveTemplate(tmpl);
     }
     setIsSaving(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2000);
   };
 
   const handleExport = async () => {
@@ -167,48 +207,54 @@ export default function EditorPage() {
   };
 
   return (
-    <div className="h-screen w-full flex flex-col bg-white overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-card overflow-hidden">
       {/* Header */}
-      <header className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white z-10 shrink-0">
+      <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card z-10 shrink-0">
         <div className="flex items-center gap-4">
           <Link href="/dashboard">
-            <Button variant="ghost" size="sm" className="h-8 gap-1 text-slate-500 hover:text-slate-900">
+            <Button variant="ghost" size="sm" className="h-8 gap-1 text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
           </Link>
-          <div className="h-4 w-px bg-slate-200"></div>
-          <span className="font-medium text-sm text-slate-900 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
+          <div className="h-4 w-px bg-border"></div>
+          <span className="font-medium text-sm text-foreground bg-muted px-2.5 py-1 rounded-md border border-border flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
             Editing Template
           </span>
         </div>
         <div className="flex items-center gap-2">
           <ThemeInjector onThemeChange={setThemeCSS} />
-          
-          <Button 
-            size="sm" 
+
+          <Button
+            size="sm"
             variant="outline"
-            onClick={handleExport} 
+            onClick={handleExport}
             disabled={isExporting}
-            className="border-slate-200"
           >
             <Download className="h-4 w-4 mr-2" />
             {isExporting ? "Exporting..." : "Export HTML"}
           </Button>
 
-          <Button 
-            size="sm" 
-            onClick={handleSave} 
+          <Button
+            size="sm"
+            variant="default"
+            onClick={handleSave}
             disabled={isSaving}
-            className="bg-orange-500 hover:bg-orange-600 border-0 text-white shadow-sm"
+            className={saveSuccess ? "bg-green-600 hover:bg-green-700" : ""}
           >
-            <Save className="h-4 w-4 mr-2" />
-            {isSaving ? "Saving..." : "Save Template"}
+            {saveSuccess ? (
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save Template"}
           </Button>
         </div>
       </header>
 
       {/* Editor Main */}
-      <DndContext 
+      <DndContext
+        sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -220,12 +266,15 @@ export default function EditorPage() {
         </div>
 
         <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
-          {activeDragType ? (
-            <div className="px-4 py-3 rounded-lg border-2 border-primary bg-primary/10 text-primary font-semibold shadow-2xl backdrop-blur-sm text-sm flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              {activeDragType}
-            </div>
-          ) : null}
+          {activeDragType ? (() => {
+            const Icon = NODE_ICONS[activeDragType] || Type;
+            return (
+              <div className="px-4 py-3 rounded-lg border-2 border-primary bg-primary/10 text-primary font-semibold shadow-2xl backdrop-blur-sm text-sm flex items-center gap-2">
+                <Icon className="h-4 w-4" />
+                {activeDragType}
+              </div>
+            );
+          })() : null}
         </DragOverlay>
       </DndContext>
     </div>
@@ -234,8 +283,8 @@ export default function EditorPage() {
 
 function getDefaultProps(type: EditorNodeType) {
   switch (type) {
-    case 'TEXT': return { content: 'Add your text here...', style: { color: 'var(--foreground)' } };
-    case 'BUTTON': return { content: 'Click Here', href: '#', style: {} };
+    case 'TEXT': return { content: 'Add your text here...', style: { color: 'var(--foreground)', fontSize: '16px', fontWeight: '400', lineHeight: '1.6', textAlign: 'left' } };
+    case 'BUTTON': return { content: 'Click Here', href: '#', style: { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' } };
     case 'IMAGE': return { src: 'https://placehold.co/600x400', alt: 'Placeholder', style: { width: '100%', borderRadius: 'var(--radius)' } };
     case 'CONTAINER': return { style: { padding: '20px', backgroundColor: 'transparent' } };
     case 'DIVIDER': return { style: { width: '100%' } };
