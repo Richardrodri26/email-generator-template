@@ -5,7 +5,8 @@ import { useEditorStore } from "@/application/useEditorStore";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, BarChart2, TrendingUp, PieChart, Plus, Link2, Link2Off } from "lucide-react";
+import { Trash2, BarChart2, TrendingUp, PieChart, Plus, Link2, Link2Off, Bookmark } from "lucide-react";
+import { usePresetsStore } from "@/application/usePresetsStore";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 
@@ -99,9 +100,31 @@ export function EditorPropertiesPanel() {
       <div className="p-4 border-b border-border flex items-center justify-between">
         <h2 className="font-semibold text-foreground capitalize">{node.type.toLowerCase()} Properties</h2>
         {node.id !== "root" && (
-          <Button variant="ghost" size="icon" onClick={() => removeNode(node.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {node.type !== "ROOT" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Save as preset"
+                onClick={() => {
+                  const name = window.prompt("Preset name:", `${node.type} preset`);
+                  if (!name) return;
+                  usePresetsStore.getState().save({
+                    id: crypto.randomUUID(),
+                    name,
+                    nodeType: node.type,
+                    props: { ...node.props },
+                    createdAt: new Date().toISOString(),
+                  });
+                }}
+              >
+                <Bookmark className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => removeNode(node.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </div>
 
