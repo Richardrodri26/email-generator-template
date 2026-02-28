@@ -120,6 +120,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     width?: string;
     height?: string;
   } | null>(null);
+  const [localPosition, setLocalPosition] = useState<{ left: string; top: string } | null>(null);
 
   if (!node) return null;
 
@@ -128,6 +129,8 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     node.type === "ROOT" ||
     node.type === "CONTAINER" ||
     node.type === "CARD";
+
+  const isAbsolute = node.props.style?.position === "absolute";
 
   const {
     setNodeRef,
@@ -144,7 +147,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       nodeId,
       acceptsChildren: isContainer,
     },
-    disabled: node.type === "ROOT",
+    disabled: node.type === "ROOT" || isAbsolute,
   });
 
   const handleClick = (e: React.MouseEvent) => {
@@ -195,6 +198,42 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     [nodeId, node.props.style, updateNodeProps],
   );
 
+  // ── Drag overlay elements ────
+  const startDragPosition = useCallback(
+    (e: React.PointerEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startLeft = parseFloat(node.props.style?.left ?? "") || 0;
+      const startTop = parseFloat(node.props.style?.top ?? "") || 0;
+
+      const move = (ev: PointerEvent) => {
+        ev.preventDefault();
+        setLocalPosition({
+          left: `${startLeft + (ev.clientX - startX)}px`,
+          top: `${startTop + (ev.clientY - startY)}px`,
+        });
+      };
+
+      const up = (ev: PointerEvent) => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", up);
+        const newLeft = `${startLeft + (ev.clientX - startX)}px`;
+        const newTop = `${startTop + (ev.clientY - startY)}px`;
+        updateNodeProps(nodeId, {
+          style: { ...node.props.style, left: newLeft, top: newTop },
+        });
+        setLocalPosition(null);
+      };
+
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerup", up);
+    },
+    [nodeId, node.props.style, updateNodeProps],
+  );
+
   // ── Computed styles ────
   const draggingStyle = {
     transform: CSS.Transform.toString(transform),
@@ -205,10 +244,10 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
   const merged: Record<string, string | undefined> = {
     ...node.props.style,
     ...localSize,
+    ...(localPosition ?? {}),
   };
 
   const widthLabel = colLabel(merged.width);
-  const isAbsolute = node.props.style?.position === "absolute";
 
   // ── Per-type border-radius class (so ring follows node shape) ────
   const nodeRoundedClass =
@@ -235,6 +274,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
         node.type === "ROOT"
           ? "flex flex-col flex-1 w-full"
           : "",
+        isAbsolute ? "cursor-move" : "",
       ].join(" ")}
       style={{
         ...merged,
@@ -247,13 +287,15 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
               : undefined,
         position: isAbsolute ? "absolute" : "relative",
         ...(isAbsolute ? {
+          touchAction: "none",
           left: merged.left || "0px",
           top: merged.top || "0px",
           zIndex: Number(merged.zIndex) || 10,
         } : {}),
       }}
-      {...(node.type !== "ROOT" ? attributes : {})}
-      {...(node.type !== "ROOT" ? listeners : {})}
+      {...(node.type !== "ROOT" && !isAbsolute ? attributes : {})}
+      {...(node.type !== "ROOT" && !isAbsolute ? listeners : {})}
+      onPointerDown={isAbsolute ? startDragPosition : undefined}
     >
       {/* ── Label (visible on hover + selection) ── */}
       {node.type !== "ROOT" && (
