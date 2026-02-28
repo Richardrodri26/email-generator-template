@@ -2,6 +2,7 @@
 
 import { useState, useCallback, createContext, useContext, Fragment } from "react";
 import { useEditorStore } from "@/application/useEditorStore";
+import { useEmailDarkModeStore } from "@/application/useEmailDarkModeStore";
 import {
   useSortable,
   SortableContext,
@@ -115,6 +116,8 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const selectNode = useEditorStore((s) => s.selectNode);
   const updateNodeProps = useEditorStore((s) => s.updateNodeProps);
+
+  const { previewDark } = useEmailDarkModeStore();
 
   const [localSize, setLocalSize] = useState<{
     width?: string;
@@ -243,6 +246,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
 
   const merged: Record<string, string | undefined> = {
     ...node.props.style,
+    ...(previewDark && node.props.darkStyle ? node.props.darkStyle : {}),
     ...localSize,
     ...(localPosition ?? {}),
   };
@@ -668,6 +672,7 @@ interface EditorCanvasProps {
 export function EditorCanvas({ themeCSS, overNodeId = null, dropAbove = true, activeDragId = null }: EditorCanvasProps) {
   const rootNodeId = useEditorStore((s) => s.data.rootNodeId);
   const selectNode = useEditorStore((s) => s.selectNode);
+  const { previewDark } = useEmailDarkModeStore();
 
   const scopedCSS = themeCSS
     ? themeCSS
@@ -684,7 +689,10 @@ export function EditorCanvas({ themeCSS, overNodeId = null, dropAbove = true, ac
         <style>{scopedCSS}</style>
 
         {/* 12-col grid overlay guide (visible only while hovering canvas) */}
-        <div className="w-full max-w-150 min-h-200 bg-background shadow-xl rounded-sm email-editor-preview flex flex-col relative group/canvas">
+        <div
+          className="w-full max-w-150 min-h-200 bg-background shadow-xl rounded-sm email-editor-preview flex flex-col relative group/canvas"
+          style={{ backgroundColor: previewDark ? "#1a1a1a" : undefined }}
+        >
           {/* Grid guide lines */}
           <div className="absolute inset-0 pointer-events-none opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-300 z-0">
             <div className="h-full w-full flex">

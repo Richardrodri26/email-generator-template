@@ -89,6 +89,20 @@ function generateChartSvg(
   </svg>`;
 }
 
+function buildDarkMediaCSS(data: TemplateData): string {
+  const rules: string[] = [];
+  for (const node of Object.values(data.nodes)) {
+    if (node.props.darkStyle && Object.keys(node.props.darkStyle).length > 0) {
+      const styleStr = Object.entries(node.props.darkStyle as Record<string, string>)
+        .map(([k, v]) => `${k.replace(/([A-Z])/g, "-$1").toLowerCase()}: ${v}`)
+        .join("; ");
+      rules.push(`  [data-node-id="${node.id}"] { ${styleStr} }`);
+    }
+  }
+  if (rules.length === 0) return "";
+  return `@media (prefers-color-scheme: dark) {\n${rules.join("\n")}\n}`;
+}
+
 export function generateReactEmailElement(data: TemplateData, themeCSS: string = "") {
   const renderNode = (nodeId: string): React.ReactNode => {
     const node = data.nodes[nodeId];
@@ -99,7 +113,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
     switch (node.type) {
       case "TEXT":
         return (
-          <Text key={node.id} style={node.props.style}>
+          <Text key={node.id} data-node-id={node.id} style={node.props.style}>
             {node.props.content}
           </Text>
         );
@@ -107,6 +121,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         return (
           <ReactEmailButton
             key={node.id}
+            data-node-id={node.id}
             href={node.props.href}
             style={{
               borderRadius: "6px",
@@ -126,27 +141,28 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         );
       case "IMAGE":
         return (
-          <Img 
-            key={node.id} 
-            src={node.props.src} 
-            alt={node.props.alt} 
-            style={node.props.style} 
+          <Img
+            key={node.id}
+            data-node-id={node.id}
+            src={node.props.src}
+            alt={node.props.alt}
+            style={node.props.style}
           />
         );
       case "CONTAINER":
         return (
-          <Section key={node.id} style={node.props.style}>
+          <Section key={node.id} data-node-id={node.id} style={node.props.style}>
             {children}
           </Section>
         );
       case "DIVIDER":
-        return <Hr key={node.id} style={{ margin: "20px 0", borderColor: "#e2e8f0", ...node.props.style }} />;
+        return <Hr key={node.id} data-node-id={node.id} style={{ margin: "20px 0", borderColor: "#e2e8f0", ...node.props.style }} />;
       case "SPACER":
-        return <Section key={node.id} style={{ height: node.props.height || "40px", ...node.props.style }} />;
+        return <Section key={node.id} data-node-id={node.id} style={{ height: node.props.height || "40px", ...node.props.style }} />;
       case "COLUMNS":
         // Wrapping children into columns
         return (
-          <Row key={node.id} style={node.props.style}>
+          <Row key={node.id} data-node-id={node.id} style={node.props.style}>
             {node.children.map((childId) => (
               <Column key={childId}>{renderNode(childId)}</Column>
             ))}
@@ -154,7 +170,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         );
       case "SOCIAL":
         return (
-          <Row key={node.id} style={{ padding: "10px", ...node.props.style }}>
+          <Row key={node.id} data-node-id={node.id} style={{ padding: "10px", ...node.props.style }}>
             <Column align="center">
               <Link href="#" style={{ display: "inline-block", padding: "8px", margin: "0 4px", backgroundColor: "#3b5998", color: "white", borderRadius: "50%", width: "16px", height: "16px", textAlign: "center", textDecoration: "none", lineHeight: "16px" }}>f</Link>
               <Link href="#" style={{ display: "inline-block", padding: "8px", margin: "0 4px", backgroundColor: "#1da1f2", color: "white", borderRadius: "50%", width: "16px", height: "16px", textAlign: "center", textDecoration: "none", lineHeight: "16px" }}>t</Link>
@@ -164,7 +180,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         );
       case "CARD":
         return (
-          <Section key={node.id} style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", ...node.props.style }}>
+          <Section key={node.id} data-node-id={node.id} style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", ...node.props.style }}>
             {node.props.cardTitle && (
               <Section style={{ padding: "24px 24px 0 24px" }}>
                 <Text style={{ fontSize: "16px", fontWeight: "600", margin: "0" }}>{node.props.cardTitle}</Text>
@@ -182,7 +198,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         const headers = node.props.headers || ["Header 1", "Header 2", "Header 3"];
         const rows = node.props.rows || [["Cell 1", "Cell 2", "Cell 3"]];
         return (
-          <Section key={node.id} style={{ width: "100%", ...node.props.style }}>
+          <Section key={node.id} data-node-id={node.id} style={{ width: "100%", ...node.props.style }}>
             <Row style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
               {headers.map((h: string, i: number) => (
                 <Column key={i} style={{ padding: "12px 16px", fontSize: "12px", fontWeight: "500", color: "#6b7280", textTransform: "uppercase" as const }}>{h}</Column>
@@ -209,6 +225,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         return (
           <Text
             key={node.id}
+            data-node-id={node.id}
             style={{
               display: "inline-block",
               padding: "2px 10px",
@@ -235,7 +252,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
 
         return (
-          <Section key={node.id} style={{ width: "100%", ...node.props.style }}>
+          <Section key={node.id} data-node-id={node.id} style={{ width: "100%", ...node.props.style }}>
             {node.props.chartTitle && (
               <Text style={{ fontSize: "14px", fontWeight: "600", margin: "0 0 8px 0" }}>
                 {node.props.chartTitle}
@@ -247,7 +264,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
       }
       case "ROOT":
         return (
-          <Container key={node.id} style={node.props.style}>
+          <Container key={node.id} data-node-id={node.id} style={node.props.style}>
             {children}
           </Container>
         );
@@ -257,12 +274,13 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
   };
 
   const rootElement = renderNode(data.rootNodeId);
+  const darkCSS = buildDarkMediaCSS(data);
 
   return (
     <Html>
       <Head>
         <style>{`${themeCSS}`}</style>
-        {/* You can load custom fonts here based on theme */}
+        {darkCSS && <style>{darkCSS}</style>}
       </Head>
       <Tailwind config={generateTailwindConfig(themeCSS)}>
         <Body style={{ backgroundColor: "#ffffff", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" }}>

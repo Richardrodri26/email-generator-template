@@ -10,7 +10,8 @@ import { EditorSidebar } from "@/components/organisms/Editor/Sidebar";
 import { EditorCanvas } from "@/components/organisms/Editor/Canvas";
 import { EditorPropertiesPanel } from "@/components/organisms/Editor/PropertiesPanel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Tag, BarChart2 } from "lucide-react";
+import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Tag, BarChart2, Moon } from "lucide-react";
+import { useEmailDarkModeStore } from "@/application/useEmailDarkModeStore";
 import { LocalStorageTemplateRepository } from "@/infrastructure/repositories/LocalStorageTemplateRepository";
 import { v4 as uuidv4 } from "uuid";
 import Link from "next/link";
@@ -52,6 +53,7 @@ export default function EditorPage() {
   const dropAboveRef = useRef(true);
   const [themeCSS, setThemeCSS] = useState("");
   const mouseYRef = useRef(0);
+  const { previewDark, togglePreviewDark } = useEmailDarkModeStore();
 
   // Editor Store actions
   const initialize = useEditorStore((state) => state.initialize);
@@ -287,6 +289,16 @@ export default function EditorPage() {
         </div>
         <div className="flex items-center gap-2">
           <ThemeInjector onThemeChange={setThemeCSS} />
+
+          <Button
+            size="sm"
+            variant={previewDark ? "default" : "outline"}
+            onClick={togglePreviewDark}
+            title="Toggle email dark mode preview"
+          >
+            <Moon className="h-4 w-4 mr-2" />
+            {previewDark ? "Dark" : "Light"}
+          </Button>
 
           <Button
             size="sm"

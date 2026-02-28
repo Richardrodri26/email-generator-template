@@ -343,6 +343,46 @@ export function EditorPropertiesPanel() {
                 />
               </div>
             </div>
+
+            <div className="space-y-3 border-t border-border pt-3">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dark Mode Colors</h3>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Dark Background</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    value={node.props.darkStyle?.backgroundColor || "#1a1a1a"}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, backgroundColor: e.target.value } })}
+                    className="w-12 p-1 h-9"
+                  />
+                  <Input
+                    type="text"
+                    value={node.props.darkStyle?.backgroundColor || ""}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, backgroundColor: e.target.value } })}
+                    placeholder="#1a1a1a"
+                    className="flex-1 font-mono text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Dark Text Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    value={node.props.darkStyle?.color || "#ffffff"}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, color: e.target.value } })}
+                    className="w-12 p-1 h-9"
+                  />
+                  <Input
+                    type="text"
+                    value={node.props.darkStyle?.color || ""}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, color: e.target.value } })}
+                    placeholder="#ffffff"
+                    className="flex-1 font-mono text-sm"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -397,6 +437,46 @@ export function EditorPropertiesPanel() {
                   onChange={(e) => handleStyleChange("color", e.target.value)}
                   className="flex-1 font-mono text-sm"
                 />
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t border-border pt-3">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dark Mode Colors</h3>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Dark Background</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    value={node.props.darkStyle?.backgroundColor || "#1a1a1a"}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, backgroundColor: e.target.value } })}
+                    className="w-12 p-1 h-9"
+                  />
+                  <Input
+                    type="text"
+                    value={node.props.darkStyle?.backgroundColor || ""}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, backgroundColor: e.target.value } })}
+                    placeholder="#1a1a1a"
+                    className="flex-1 font-mono text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Dark Text Color</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    value={node.props.darkStyle?.color || "#ffffff"}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, color: e.target.value } })}
+                    className="w-12 p-1 h-9"
+                  />
+                  <Input
+                    type="text"
+                    value={node.props.darkStyle?.color || ""}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, color: e.target.value } })}
+                    placeholder="#ffffff"
+                    className="flex-1 font-mono text-sm"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -459,6 +539,28 @@ export function EditorPropertiesPanel() {
                   onChange={(e) => handleStyleChange("backgroundColor", e.target.value)}
                   className="flex-1 font-mono text-sm"
                 />
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t border-border pt-3">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dark Mode Colors</h3>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Dark Background</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    value={node.props.darkStyle?.backgroundColor || "#1a1a1a"}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, backgroundColor: e.target.value } })}
+                    className="w-12 p-1 h-9"
+                  />
+                  <Input
+                    type="text"
+                    value={node.props.darkStyle?.backgroundColor || ""}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, backgroundColor: e.target.value } })}
+                    placeholder="#1a1a1a"
+                    className="flex-1 font-mono text-sm"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -790,6 +892,28 @@ export function EditorPropertiesPanel() {
                 </div>
               </div>
             )}
+
+            <div className="space-y-3 border-t border-border pt-3">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dark Mode Colors</h3>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Dark Background</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="color"
+                    value={node.props.darkStyle?.backgroundColor || "#1a1a1a"}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, backgroundColor: e.target.value } })}
+                    className="w-12 p-1 h-9"
+                  />
+                  <Input
+                    type="text"
+                    value={node.props.darkStyle?.backgroundColor || ""}
+                    onChange={(e) => updateNodeProps(node.id, { darkStyle: { ...node.props.darkStyle, backgroundColor: e.target.value } })}
+                    placeholder="#1a1a1a"
+                    className="flex-1 font-mono text-sm"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
