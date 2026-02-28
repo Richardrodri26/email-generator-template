@@ -134,6 +134,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
   };
 
   const widthLabel = colLabel(merged.width);
+  const isAbsolute = node.props.style?.position === "absolute";
 
   // ── Wrapper ────
   const wrapWithSelection = (children: React.ReactNode) => (
@@ -162,7 +163,12 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
             : isContainer && node.children.length === 0
               ? "60px"
               : undefined,
-        position: "relative",
+        position: isAbsolute ? "absolute" : "relative",
+        ...(isAbsolute ? {
+          left: merged.left || "0px",
+          top: merged.top || "0px",
+          zIndex: Number(merged.zIndex) || 10,
+        } : {}),
       }}
       {...(node.type !== "ROOT" ? attributes : {})}
       {...(node.type !== "ROOT" ? listeners : {})}
@@ -185,6 +191,11 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
           {isSelected && widthLabel && (
             <span className="bg-muted text-muted-foreground text-[10px] font-mono px-1.5 py-0.5 rounded-sm">
               {widthLabel}
+            </span>
+          )}
+          {isAbsolute && (
+            <span className="text-[9px] font-mono bg-yellow-100 text-yellow-700 border border-yellow-300 px-1 py-0.5 rounded ml-1">
+              floating
             </span>
           )}
         </div>
