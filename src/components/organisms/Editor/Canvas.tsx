@@ -3,6 +3,7 @@
 import { useState, useCallback, createContext, useContext, Fragment } from "react";
 import { useEditorStore } from "@/application/useEditorStore";
 import { useEmailDarkModeStore } from "@/application/useEmailDarkModeStore";
+import { usePreviewStore, DEVICE_WIDTHS } from "@/application/usePreviewStore";
 import {
   useSortable,
   SortableContext,
@@ -673,6 +674,8 @@ export function EditorCanvas({ themeCSS, overNodeId = null, dropAbove = true, ac
   const rootNodeId = useEditorStore((s) => s.data.rootNodeId);
   const selectNode = useEditorStore((s) => s.selectNode);
   const { previewDark } = useEmailDarkModeStore();
+  const { device } = usePreviewStore();
+  const previewWidth = DEVICE_WIDTHS[device];
 
   const scopedCSS = themeCSS
     ? themeCSS
@@ -690,8 +693,9 @@ export function EditorCanvas({ themeCSS, overNodeId = null, dropAbove = true, ac
 
         {/* 12-col grid overlay guide (visible only while hovering canvas) */}
         <div
+          style={{ maxWidth: previewWidth, transition: "max-width 300ms ease" }}
           className={cn(
-            "w-full max-w-150 min-h-200 bg-background shadow-xl rounded-sm email-editor-preview flex flex-col relative group/canvas",
+            "w-full min-h-200 bg-background shadow-xl rounded-sm email-editor-preview flex flex-col relative group/canvas",
             previewDark && "dark"
           )}
         >
