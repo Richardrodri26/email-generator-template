@@ -18,6 +18,8 @@ import Link from "next/link";
 import { EditorNodeType } from "@/domain/models/Template";
 import { generateHtmlExport } from "@/application/useExportBuilder";
 import { ThemeInjector } from "@/components/organisms/Editor/ThemeInjector";
+import { useVariablesStore } from "@/application/useVariablesStore";
+import { substituteAllNodes } from "@/application/utils/templateVars";
 
 const repo = new LocalStorageTemplateRepository();
 
@@ -54,6 +56,7 @@ export default function EditorPage() {
   const [themeCSS, setThemeCSS] = useState("");
   const mouseYRef = useRef(0);
   const { previewDark, togglePreviewDark } = useEmailDarkModeStore();
+  const { data: varData } = useVariablesStore();
 
   // Editor Store actions
   const initialize = useEditorStore((state) => state.initialize);
@@ -271,6 +274,27 @@ export default function EditorPage() {
     setIsExporting(false);
   };
 
+  const handleExportRendered = async () => {
+    setIsExporting(true);
+    try {
+      const renderedData = substituteAllNodes(currentData, varData);
+      const htmlString = await generateHtmlExport(renderedData, themeCSS);
+      const blob = new Blob([htmlString], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `template-${id}-rendered.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Export Rendered Failed", e);
+      alert("Failed to export rendered HTML.");
+    }
+    setIsExporting(false);
+  };
+
   return (
     <div className="h-screen w-full flex flex-col bg-card overflow-hidden">
       {/* Header */}
@@ -307,7 +331,17 @@ export default function EditorPage() {
             disabled={isExporting}
           >
             <Download className="h-4 w-4 mr-2" />
-            {isExporting ? "Exporting..." : "Export HTML"}
+            {isExporting ? "Exporting..." : "Export Template"}
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExportRendered}
+            disabled={isExporting}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export Rendered
           </Button>
 
           <Button
