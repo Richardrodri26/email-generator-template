@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from "uuid";
 import Link from "next/link";
 import { EditorNodeType } from "@/domain/models/Template";
 import { generateHtmlExport } from "@/application/useExportBuilder";
+import { TestEmailDialog } from "@/components/organisms/Editor/TestEmailDialog";
 import { ThemeInjector } from "@/components/organisms/Editor/ThemeInjector";
 import { useVariablesStore } from "@/application/useVariablesStore";
 import { substituteAllNodes } from "@/application/utils/templateVars";
@@ -390,6 +391,10 @@ export default function EditorPage() {
             <FileText className="h-4 w-4 mr-2" />
             {isExportingPdf ? "Generating PDF..." : "Export PDF"}
           </Button>
+
+          <TestEmailDialog
+            getHtml={async () => generateHtmlExport(currentData, themeCSS)}
+          />
 
           <Button
             size="sm"
