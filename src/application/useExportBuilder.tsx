@@ -149,12 +149,23 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
             style={node.props.style}
           />
         );
-      case "CONTAINER":
+      case "CONTAINER": {
+        const flexDir = node.props.style?.flexDirection || "column";
+        if (flexDir === "row") {
+          return (
+            <Row key={node.id} data-node-id={node.id} style={node.props.style}>
+              {node.children.map((childId) => (
+                <Column key={childId}>{renderNode(childId)}</Column>
+              ))}
+            </Row>
+          );
+        }
         return (
           <Section key={node.id} data-node-id={node.id} style={node.props.style}>
             {children}
           </Section>
         );
+      }
       case "DIVIDER":
         return <Hr key={node.id} data-node-id={node.id} style={{ margin: "20px 0", borderColor: "#e2e8f0", ...node.props.style }} />;
       case "SPACER":
