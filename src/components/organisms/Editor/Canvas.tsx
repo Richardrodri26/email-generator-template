@@ -678,15 +678,31 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       );
     }
 
-    /* ── Root / Container ── */
+    /* ── Root ── */
     case "ROOT":
-    case "CONTAINER":
       return wrapWithSelection(
         <SortableContext
           items={node.children}
           strategy={verticalListSortingStrategy}
         >
           <ContainerChildren nodeId={nodeId} childIds={node.children} />
+        </SortableContext>,
+      );
+
+    /* ── Container ── */
+    case "CONTAINER":
+      return wrapWithSelection(
+        <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
+          <div style={{
+            display: "flex",
+            flexDirection: node.props.style?.flexDirection || "column",
+            gap: node.props.style?.gap || "0px",
+            alignItems: node.props.style?.alignItems || "stretch",
+            justifyContent: node.props.style?.justifyContent || "flex-start",
+            ...merged,
+          }}>
+            <ContainerChildren nodeId={nodeId} childIds={node.children} />
+          </div>
         </SortableContext>,
       );
 
