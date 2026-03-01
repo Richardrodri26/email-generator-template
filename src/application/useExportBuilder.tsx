@@ -103,21 +103,50 @@ function buildDarkMediaCSS(data: TemplateData): string {
   return `@media (prefers-color-scheme: dark) {\n${rules.join("\n")}\n}`;
 }
 
+// Email canvas reference width (desktop). Used to convert absolute px → % for overlay nodes.
+const EMAIL_CANVAS_WIDTH = 600;
+
+/**
+ * Converts a node's style for safe email rendering:
+ * - Overlay nodes (position:absolute): converts `left` from px → % so the layout
+ *   scales correctly on tablet/mobile in clients that support CSS positioning.
+ * - Non-overlay nodes: strips any stale position/left/top/zIndex properties.
+ */
+function buildEmailStyle(style: Record<string, any> | undefined): Record<string, any> {
+  if (!style) return {};
+  if (style.position !== "absolute") {
+    const { position: _p, left: _l, top: _t, zIndex: _z, ...clean } = style;
+    return clean;
+  }
+  const leftPx = parseFloat(style.left ?? "0") || 0;
+  return {
+    ...style,
+    left: `${((leftPx / EMAIL_CANVAS_WIDTH) * 100).toFixed(2)}%`,
+  };
+}
+
+/** Returns true if any direct child of the node is an overlay (position:absolute) element. */
+function hasOverlayChildren(node: EditorNode, nodes: Record<string, EditorNode>): boolean {
+  return node.children.some(id => nodes[id]?.props.style?.position === "absolute");
+}
+
 export function generateReactEmailElement(data: TemplateData, themeCSS: string = "") {
   const renderNode = (nodeId: string): React.ReactNode => {
     const node = data.nodes[nodeId];
     if (!node) return null;
 
     const children = node.children.map(renderNode);
+    const isOverlay = node.props.style?.position === "absolute";
+    const emailStyle = buildEmailStyle(node.props.style);
 
     switch (node.type) {
       case "TEXT":
         return (
-          <Text key={node.id} data-node-id={node.id} style={node.props.style}>
+          <Text key={node.id} data-node-id={node.id} style={emailStyle}>
             {node.props.content}
           </Text>
         );
-      case "BUTTON":
+      case "BUTTON": {
         return (
           <ReactEmailButton
             key={node.id}
@@ -129,16 +158,19 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
               fontSize: "14px",
               textAlign: "center",
               display: "inline-block",
-              ...node.props.style,
-              paddingTop: node.props.style?.paddingTop || "10px",
-              paddingRight: node.props.style?.paddingRight || "20px",
-              paddingBottom: node.props.style?.paddingBottom || "10px",
-              paddingLeft: node.props.style?.paddingLeft || "20px",
+              // Full-width only for non-overlay buttons; overlay buttons use their own width
+              ...(isOverlay ? {} : { width: "100%" }),
+              ...emailStyle,
+              paddingTop: emailStyle?.paddingTop || "10px",
+              paddingRight: emailStyle?.paddingRight || "20px",
+              paddingBottom: emailStyle?.paddingBottom || "10px",
+              paddingLeft: emailStyle?.paddingLeft || "20px",
             }}
           >
             {node.props.content}
           </ReactEmailButton>
         );
+      }
       case "IMAGE":
         return (
           <Img
@@ -146,14 +178,18 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
             data-node-id={node.id}
             src={node.props.src}
             alt={node.props.alt}
-            style={node.props.style}
+            style={emailStyle}
           />
         );
       case "CONTAINER": {
         const flexDir = node.props.style?.flexDirection || "column";
+        const containerStyle = {
+          ...emailStyle,
+          ...(hasOverlayChildren(node, data.nodes) ? { position: "relative" as const } : {}),
+        };
         if (flexDir === "row") {
           return (
-            <Row key={node.id} data-node-id={node.id} style={node.props.style}>
+            <Row key={node.id} data-node-id={node.id} style={containerStyle}>
               {node.children.map((childId) => (
                 <Column key={childId}>{renderNode(childId)}</Column>
               ))}
@@ -161,15 +197,15 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
           );
         }
         return (
-          <Section key={node.id} data-node-id={node.id} style={node.props.style}>
+          <Section key={node.id} data-node-id={node.id} style={containerStyle}>
             {children}
           </Section>
         );
       }
       case "DIVIDER":
-        return <Hr key={node.id} data-node-id={node.id} style={{ margin: "20px 0", borderColor: "#e2e8f0", ...node.props.style }} />;
+        return <Hr key={node.id} data-node-id={node.id} style={{ margin: "20px 0", borderColor: "#e2e8f0", ...emailStyle }} />;
       case "SPACER":
-        return <Section key={node.id} data-node-id={node.id} style={{ height: node.props.height || "40px", ...node.props.style }} />;
+        return <Section key={node.id} data-node-id={node.id} style={{ height: node.props.height || "40px", ...emailStyle }} />;
       case "COLUMNS":
         // Wrapping children into columns
         return (
@@ -275,7 +311,14 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
       }
       case "ROOT":
         return (
-          <Container key={node.id} data-node-id={node.id} style={node.props.style}>
+          <Container
+            key={node.id}
+            data-node-id={node.id}
+            style={{
+              ...node.props.style,
+              ...(hasOverlayChildren(node, data.nodes) ? { position: "relative" as const } : {}),
+            }}
+          >
             {children}
           </Container>
         );

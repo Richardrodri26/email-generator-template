@@ -11,8 +11,7 @@ export function ThemeToggle() {
 
   useEffect(() => {
     setMounted(true);
-    document.documentElement.classList.toggle("dark", theme === "dark");
-  }, [theme]);
+  }, []);
 
   // Render a placeholder with the same dimensions to avoid layout shift
   if (!mounted) {

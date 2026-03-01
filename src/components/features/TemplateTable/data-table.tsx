@@ -32,14 +32,14 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="rounded-md border bg-white shadow-sm overflow-hidden">
+    <div className="rounded-md border bg-card shadow-sm overflow-hidden">
       <Table>
-        <TableHeader className="bg-slate-50 border-b">
+        <TableHeader className="bg-muted/50 border-b">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="hover:bg-transparent">
               {headerGroup.headers.map((header) => {
                 return (
-                  <TableHead key={header.id} className="font-semibold text-slate-600">
+                  <TableHead key={header.id} className="font-semibold text-muted-foreground">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -58,7 +58,7 @@ export function DataTable<TData, TValue>({
               <TableRow
                 key={row.id}
                 data-state={row.getIsSelected() && "selected"}
-                className="hover:bg-slate-50/50 transition-colors"
+                className="hover:bg-muted/30 transition-colors"
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="py-4">
@@ -69,7 +69,7 @@ export function DataTable<TData, TValue>({
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center text-slate-500">
+              <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
                 No templates found. Create one to get started!
               </TableCell>
             </TableRow>

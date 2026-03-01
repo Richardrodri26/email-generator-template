@@ -138,6 +138,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
   const isContainer =
     node.type === "ROOT" ||
     node.type === "CONTAINER" ||
+    node.type === "COLUMNS" ||
     node.type === "CARD";
 
   const isAbsolute = node.props.style?.position === "absolute";
@@ -180,11 +181,26 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       const startH = el.offsetHeight;
       const parentW = el.parentElement?.clientWidth || 600;
 
+      // For BUTTON: measure the natural content width and height to enforce as minimums
+      let minContentW = 1;
+      let minContentH = 20;
+      if (node.type === "BUTTON") {
+        const savedWidth = el.style.width;
+        el.style.width = "max-content";
+        minContentW = el.offsetWidth;
+        el.style.width = savedWidth;
+
+        const savedHeight = el.style.height;
+        el.style.height = "auto";
+        minContentH = el.offsetHeight;
+        el.style.height = savedHeight;
+      }
+
       const move = (ev: PointerEvent) => {
         ev.preventDefault();
         const s: Record<string, string> = {};
-        if (dir !== "v") s.width = snapToGrid(startW + (ev.clientX - startX), parentW);
-        if (dir !== "h") s.height = `${Math.max(20, startH + (ev.clientY - startY))}px`;
+        if (dir !== "v") s.width = snapToGrid(Math.max(minContentW, startW + (ev.clientX - startX)), parentW);
+        if (dir !== "h") s.height = `${Math.max(minContentH, startH + (ev.clientY - startY))}px`;
         setLocalSize(s);
       };
 
@@ -193,8 +209,8 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
         document.removeEventListener("pointerup", up);
 
         const s: Record<string, string> = {};
-        if (dir !== "v") s.width = snapToGrid(startW + (ev.clientX - startX), parentW);
-        if (dir !== "h") s.height = `${Math.max(20, startH + (ev.clientY - startY))}px`;
+        if (dir !== "v") s.width = snapToGrid(Math.max(minContentW, startW + (ev.clientX - startX)), parentW);
+        if (dir !== "h") s.height = `${Math.max(minContentH, startH + (ev.clientY - startY))}px`;
 
         updateNodeProps(nodeId, {
           style: { ...node.props.style, ...s },
@@ -324,7 +340,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
           node.type === "ROOT"
             ? "100%"
             : isContainer && node.children.length === 0
-              ? "60px"
+              ? "80px"
               : undefined,
         position: isAbsolute ? "absolute" : "relative",
         ...(isAbsolute ? {
@@ -333,10 +349,11 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
           top: merged.top || "0px",
           zIndex: Number(merged.zIndex) || 10,
         } : {}),
+        ...(node.type === "BUTTON" ? { minWidth: "max-content" } : {}),
       }}
       {...(node.type !== "ROOT" && !isAbsolute ? attributes : {})}
       {...(node.type !== "ROOT" && !isAbsolute ? listeners : {})}
-      onPointerDown={isAbsolute ? startDragPosition : undefined}
+      {...(isAbsolute ? { onPointerDown: startDragPosition } : {})}
     >
       {/* ── Label (visible on hover + selection) ── */}
       {node.type !== "ROOT" && (
@@ -359,7 +376,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
             </span>
           )}
           {isAbsolute && (
-            <span className="text-[9px] font-mono bg-yellow-100 text-yellow-700 border border-yellow-300 px-1 py-0.5 rounded ml-1">
+            <span className="text-[9px] font-mono bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700 px-1 py-0.5 rounded ml-1">
               floating
             </span>
           )}
@@ -433,7 +450,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
           style={{
             backgroundColor: customBg,
             color: customColor,
-            width: merged.width || undefined,
+            width: "100%",
           }}
           className="pointer-events-none"
         >

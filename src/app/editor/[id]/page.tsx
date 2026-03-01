@@ -223,12 +223,44 @@ export default function EditorPage() {
     if (isNew) {
       const type = active.data.current?.type as EditorNodeType;
       const presetProps = active.data.current?.presetProps;
-      addNode(parentId, {
-        id: uuidv4(),
-        type,
-        props: presetProps ?? getDefaultProps(type),
-        children: [],
-      }, insertIndex);
+
+      if (type === 'COLUMNS' && !presetProps) {
+        // Auto-create 2 empty column containers so the user has immediate drop zones
+        const columnsId = uuidv4();
+        const col1Id = uuidv4();
+        const col2Id = uuidv4();
+        const colProps = {
+          style: {
+            flex: '1',
+            minHeight: '80px',
+            paddingTop: '12px',
+            paddingRight: '12px',
+            paddingBottom: '12px',
+            paddingLeft: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0px',
+            alignItems: 'stretch',
+            justifyContent: 'flex-start',
+          },
+        };
+        addNode(parentId, {
+          id: columnsId,
+          type,
+          props: getDefaultProps(type),
+          children: [col1Id, col2Id],
+        }, insertIndex, [
+          { id: col1Id, type: 'CONTAINER', props: colProps, children: [] },
+          { id: col2Id, type: 'CONTAINER', props: colProps, children: [] },
+        ]);
+      } else {
+        addNode(parentId, {
+          id: uuidv4(),
+          type,
+          props: presetProps ?? getDefaultProps(type),
+          children: [],
+        }, insertIndex);
+      }
     } else {
       if (active.id !== over.id) {
         if (isOverContainer) {
@@ -453,7 +485,7 @@ export default function EditorPage() {
 function getDefaultProps(type: EditorNodeType) {
   switch (type) {
     case 'TEXT': return { content: 'Add your text here...', style: { color: 'var(--foreground)', fontSize: '16px', fontWeight: '400', lineHeight: '1.6', textAlign: 'left' } };
-    case 'BUTTON': return { content: 'Click Here', href: '#', style: { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' } };
+    case 'BUTTON': return { content: 'Click Here', href: '#', style: { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)', width: '100%', textAlign: 'center' } };
     case 'IMAGE': return { src: 'https://placehold.co/600x400', alt: 'Placeholder', style: { width: '100%', borderRadius: 'var(--radius)' } };
     case 'CONTAINER': return { style: { paddingTop: '20px', paddingRight: '20px', paddingBottom: '20px', paddingLeft: '20px', backgroundColor: 'transparent', display: 'flex', flexDirection: 'column', gap: '0px', alignItems: 'stretch', justifyContent: 'flex-start' } };
     case 'DIVIDER': return { style: { width: '100%' } };

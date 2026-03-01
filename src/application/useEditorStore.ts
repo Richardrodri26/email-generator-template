@@ -12,7 +12,7 @@ interface EditorState {
   // Actions
   initialize: (data: TemplateData) => void;
   selectNode: (id: string | null) => void;
-  addNode: (parentId: string, node: EditorNode, index?: number) => void;
+  addNode: (parentId: string, node: EditorNode, index?: number, additionalNodes?: EditorNode[]) => void;
   moveNode: (id: string, newParentId: string, newIndex: number) => void;
   reorderNode: (parentId: string, activeId: string, overId: string, insertBefore?: boolean) => void;
   updateNodeProps: (id: string, props: Record<string, any>) => void;
@@ -51,8 +51,14 @@ export const useEditorStore = create<EditorState>()(
         state.selectedNodeId = id;
       }),
 
-    addNode: (parentId, node, index) =>
+    addNode: (parentId, node, index, additionalNodes) =>
       set((state) => {
+        // Add any extra nodes first (e.g., pre-built column children)
+        if (additionalNodes) {
+          for (const extra of additionalNodes) {
+            state.data.nodes[extra.id] = extra;
+          }
+        }
         // Add the node to the dictionary
         state.data.nodes[node.id] = node;
 

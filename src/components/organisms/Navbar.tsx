@@ -90,8 +90,8 @@ export function Navbar() {
               </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="relative h-9 w-9 rounded-full border border-orange-200 bg-orange-50 hover:bg-orange-100 flex items-center justify-center">
-                    <span className="font-bold text-orange-600">{user.name.charAt(0).toUpperCase()}</span>
+                  <Button variant="outline" className="relative h-9 w-9 rounded-full border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/50 flex items-center justify-center">
+                    <span className="font-bold text-orange-600 dark:text-orange-400">{user.name.charAt(0).toUpperCase()}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -100,7 +100,7 @@ export function Navbar() {
                       <p className="text-sm font-medium leading-none">{user.name}</p>
                       <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                       <div className="mt-1 flex items-center">
-                        <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
+                        <span className="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-xs font-medium text-orange-800 dark:text-orange-300">
                           {user.role}
                         </span>
                       </div>

@@ -5,7 +5,7 @@ import { useEditorStore } from "@/application/useEditorStore";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, BarChart2, TrendingUp, PieChart, Plus, Link2, Link2Off, Bookmark, ArrowRight, ArrowDown } from "lucide-react";
+import { Trash2, BarChart2, TrendingUp, PieChart, Plus, Link2, Link2Off, Bookmark, ArrowRight, ArrowDown, AlertTriangle } from "lucide-react";
 import { usePresetsStore } from "@/application/usePresetsStore";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -193,6 +193,13 @@ export function EditorPropertiesPanel() {
                     placeholder="10"
                     className="h-7 text-xs"
                   />
+                </div>
+                <div className="flex gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/30">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                    <span className="font-semibold">Outlook Desktop</span> no soporta posicionamiento absoluto — el elemento aparecerá en el flujo normal del email.{" "}
+                    <span className="opacity-80">Gmail, Apple Mail e iOS Mail sí lo soportan. La coordenada X se convierte a % al exportar para ser responsive.</span>
+                  </p>
                 </div>
               </div>
             )}

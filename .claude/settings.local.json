@@ -14,7 +14,9 @@
       "mcp__plugin_playwright_playwright__browser_type",
       "mcp__plugin_playwright_playwright__browser_snapshot",
       "Bash(rm:*)",
-      "Bash(git worktree:*)"
+      "Bash(git worktree:*)",
+      "mcp__plugin_playwright_playwright__browser_select_option",
+      "mcp__plugin_playwright_playwright__browser_fill_form"
     ]
   }
 }

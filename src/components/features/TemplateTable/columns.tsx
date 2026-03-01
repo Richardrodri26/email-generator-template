@@ -20,7 +20,7 @@ export const getColumns = (): ColumnDef<Template>[] => [
     accessorKey: "name",
     header: "Template Name",
     cell: ({ row }) => (
-      <div className="font-medium text-slate-900">{row.getValue("name")}</div>
+      <div className="font-medium text-foreground">{row.getValue("name")}</div>
     ),
   },
   {
@@ -28,7 +28,7 @@ export const getColumns = (): ColumnDef<Template>[] => [
     header: "Last Updated",
     cell: ({ row }) => {
       const date = new Date(row.getValue("updatedAt"));
-      return <div className="text-slate-500">{date.toLocaleDateString()} {date.toLocaleTimeString()}</div>;
+      return <div className="text-muted-foreground">{date.toLocaleDateString()} {date.toLocaleTimeString()}</div>;
     },
   },
   {
