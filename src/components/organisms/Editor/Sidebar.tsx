@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useEditorStore } from "@/application/useEditorStore";
 import { usePresetsStore } from "@/application/usePresetsStore";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Undo2, Redo2, Tag, BarChart2, BookmarkIcon, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Undo2, Redo2, Tag, BarChart2, BookmarkIcon, Trash2, ChevronDown, ChevronRight, LayoutGrid, Code2 } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import type { ElementPreset } from "@/domain/models/Preset";
+import { VariablesPanel } from "./VariablesPanel";
 
 const BLOCKS = [
   { type: "TEXT", label: "Text Block", icon: Type },
@@ -90,51 +92,61 @@ export function EditorSidebar() {
 
   return (
     <div className="w-72 bg-card border-r border-border flex flex-col h-full">
-      <div className="p-4 border-b border-border">
-        <h2 className="font-semibold text-foreground">Email Elements</h2>
-        <p className="text-xs text-muted-foreground mt-1">Drag and drop to add to your email.</p>
-      </div>
+      <Tabs defaultValue="blocks" className="flex flex-col flex-1 overflow-hidden">
+        <TabsList className="mx-4 mt-3 grid w-auto grid-cols-2">
+          <TabsTrigger value="blocks" className="text-xs">
+            <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> Blocks
+          </TabsTrigger>
+          <TabsTrigger value="variables" className="text-xs">
+            <Code2 className="h-3.5 w-3.5 mr-1.5" /> Variables
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-4 grid grid-cols-2 gap-3">
-          {BLOCKS.map((block) => (
-            <DraggableBlock key={block.type} {...block} />
-          ))}
-        </div>
+        <TabsContent value="blocks" className="flex-1 overflow-y-auto mt-0">
+          <div className="p-4 grid grid-cols-2 gap-3">
+            {BLOCKS.map((block) => (
+              <DraggableBlock key={block.type} {...block} />
+            ))}
+          </div>
 
-        {/* My Presets section */}
-        <div className="border-t border-border">
-          <button
-            onClick={() => setPresetsOpen((o) => !o)}
-            className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-muted/40"
-          >
-            <span className="flex items-center gap-2">
-              <BookmarkIcon className="h-4 w-4" />
-              My Presets
-              {presets.length > 0 && (
-                <span className="text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
-                  {presets.length}
-                </span>
-              )}
-            </span>
-            {presetsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </button>
+          {/* My Presets section */}
+          <div className="border-t border-border">
+            <button
+              onClick={() => setPresetsOpen((o) => !o)}
+              className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-muted/40"
+            >
+              <span className="flex items-center gap-2">
+                <BookmarkIcon className="h-4 w-4" />
+                My Presets
+                {presets.length > 0 && (
+                  <span className="text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
+                    {presets.length}
+                  </span>
+                )}
+              </span>
+              {presetsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
 
-          {presetsOpen && (
-            <div className="px-4 pb-4 space-y-2">
-              {presets.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-2">
-                  Save element styles as presets using the bookmark icon in the properties panel.
-                </p>
-              ) : (
-                presets.map((preset) => (
-                  <DraggablePresetBlock key={preset.id} preset={preset} />
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+            {presetsOpen && (
+              <div className="px-4 pb-4 space-y-2">
+                {presets.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2">
+                    Save element styles as presets using the bookmark icon in the properties panel.
+                  </p>
+                ) : (
+                  presets.map((preset) => (
+                    <DraggablePresetBlock key={preset.id} preset={preset} />
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="variables" className="flex-1 overflow-hidden mt-0">
+          <VariablesPanel />
+        </TabsContent>
+      </Tabs>
 
       <div className="p-4 border-t border-border bg-card flex gap-2">
         <Button

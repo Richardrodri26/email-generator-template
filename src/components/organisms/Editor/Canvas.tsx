@@ -7,6 +7,8 @@ import { getBBoxFromElement, computeSnapLines, type BBox } from "@/application/u
 import { useEditorStore } from "@/application/useEditorStore";
 import { useEmailDarkModeStore } from "@/application/useEmailDarkModeStore";
 import { usePreviewStore, DEVICE_WIDTHS } from "@/application/usePreviewStore";
+import { useVariablesStore } from "@/application/useVariablesStore";
+import { substituteVars } from "@/application/utils/templateVars";
 import {
   useSortable,
   SortableContext,
@@ -122,6 +124,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
   const updateNodeProps = useEditorStore((s) => s.updateNodeProps);
 
   const { previewDark } = useEmailDarkModeStore();
+  const { previewSubstitution, data: varData } = useVariablesStore();
 
   const [localSize, setLocalSize] = useState<{
     width?: string;
@@ -399,16 +402,20 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
   // ── Per-type rendering ─────────────────────────────────────────────
   switch (node.type) {
     /* ── Text ── */
-    case "TEXT":
+    case "TEXT": {
+      const displayContent = previewSubstitution
+        ? substituteVars(node.props.content || "", varData)
+        : node.props.content;
       return wrapWithSelection(
         <div style={merged} className="text-foreground">
-          {node.props.content || (
+          {displayContent || (
             <span className="italic text-muted-foreground/50 text-sm select-none">
               Edit text in the properties panel →
             </span>
           )}
         </div>,
       );
+    }
 
     /* ── Button ── */
     case "BUTTON": {
