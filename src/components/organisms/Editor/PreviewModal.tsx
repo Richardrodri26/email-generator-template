@@ -29,30 +29,32 @@ export function PreviewModal({ themeCSS }: PreviewModalProps) {
     <Dialog open={modalOpen} onOpenChange={setModalOpen}>
       <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle>Email Preview</DialogTitle>
-            <div className="flex items-center gap-1 border border-border rounded-md p-0.5 bg-muted/40">
-              {(["desktop", "tablet", "mobile"] as const).map((d) => {
-                const Icon = DEVICE_ICONS[d];
-                return (
-                  <button
-                    key={d}
-                    title={DEVICE_LABELS[d]}
-                    onClick={() => setDevice(d)}
-                    className={
-                      device === d
-                        ? "bg-background text-foreground shadow-xs rounded px-2 py-1"
-                        : "text-muted-foreground hover:text-foreground px-2 py-1 rounded"
-                    }
-                  >
-                    <Icon className="h-4 w-4" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">{DEVICE_LABELS[device]}</p>
+          <DialogTitle>Email Preview</DialogTitle>
         </DialogHeader>
+
+        {/* Device toggle centrado, conectado visualmente al preview */}
+        <div className="flex justify-center">
+          <div className="flex items-center gap-0.5 border border-border rounded-lg p-1 bg-muted/40">
+            {(["desktop", "tablet", "mobile"] as const).map((d) => {
+              const Icon = DEVICE_ICONS[d];
+              const active = device === d;
+              return (
+                <button
+                  key={d}
+                  onClick={() => setDevice(d)}
+                  className={
+                    active
+                      ? "flex items-center gap-1.5 bg-background text-foreground shadow-sm rounded-md px-3 py-1.5 text-sm font-medium transition-all"
+                      : "flex items-center gap-1.5 text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md text-sm transition-all"
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className={active ? "inline" : "hidden sm:inline"}>{DEVICE_LABELS[d]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="flex-1 overflow-auto flex items-start justify-center bg-muted/30 rounded-md p-6">
           <div
