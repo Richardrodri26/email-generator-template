@@ -27,7 +27,10 @@ export function PreviewModal({ themeCSS }: PreviewModalProps) {
 
   return (
     <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-      <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
+      <DialogContent
+        style={{ maxWidth: width + 80, transition: "max-width 300ms ease" }}
+        className="w-full h-[90vh] flex flex-col"
+      >
         <DialogHeader>
           <DialogTitle>Email Preview</DialogTitle>
         </DialogHeader>
