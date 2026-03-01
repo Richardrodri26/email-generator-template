@@ -2,6 +2,8 @@
 
 import { useState, useCallback, createContext, useContext, Fragment, useRef, useEffect } from "react";
 import { SnapLinesOverlay } from "./SnapLinesOverlay";
+import { useSnapLinesStore } from "@/application/useSnapLinesStore";
+import { getBBoxFromElement, computeSnapLines, type BBox } from "@/application/utils/snapLines";
 import { useEditorStore } from "@/application/useEditorStore";
 import { useEmailDarkModeStore } from "@/application/useEmailDarkModeStore";
 import { usePreviewStore, DEVICE_WIDTHS } from "@/application/usePreviewStore";
@@ -214,12 +216,39 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       const startLeft = parseFloat(node.props.style?.left ?? "") || 0;
       const startTop = parseFloat(node.props.style?.top ?? "") || 0;
 
+      // Capture initial bbox once for snap line math (avoids querying DOM per frame)
+      const el = document.getElementById(`node-${nodeId}`);
+      const canvasEl = document.querySelector(".email-editor-preview") as HTMLElement | null;
+      const initBBox = el && canvasEl ? getBBoxFromElement(el, canvasEl) : null;
+
       const move = (ev: PointerEvent) => {
         ev.preventDefault();
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
         setLocalPosition({
-          left: `${startLeft + (ev.clientX - startX)}px`,
-          top: `${startTop + (ev.clientY - startY)}px`,
+          left: `${startLeft + dx}px`,
+          top: `${startTop + dy}px`,
         });
+
+        if (initBBox && canvasEl) {
+          const activeBBox: BBox = {
+            left: initBBox.left + dx,
+            top: initBBox.top + dy,
+            right: initBBox.right + dx,
+            bottom: initBBox.bottom + dy,
+            centerX: initBBox.centerX + dx,
+            centerY: initBBox.centerY + dy,
+          };
+          const rootId = useEditorStore.getState().data.rootNodeId;
+          const otherBBoxes: BBox[] = [];
+          document.querySelectorAll("[id^='node-']").forEach((otherEl) => {
+            const otherId = (otherEl as HTMLElement).id.slice(5); // strip "node-"
+            if (otherId !== nodeId && otherId !== rootId) {
+              otherBBoxes.push(getBBoxFromElement(otherEl as HTMLElement, canvasEl));
+            }
+          });
+          useSnapLinesStore.getState().setLines(computeSnapLines(activeBBox, otherBBoxes));
+        }
       };
 
       const up = (ev: PointerEvent) => {
@@ -231,6 +260,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
           style: { ...node.props.style, left: newLeft, top: newTop },
         });
         setLocalPosition(null);
+        useSnapLinesStore.getState().clear();
       };
 
       document.addEventListener("pointermove", move);
