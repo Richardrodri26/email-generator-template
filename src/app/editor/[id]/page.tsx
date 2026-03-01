@@ -384,7 +384,7 @@ function getDefaultProps(type: EditorNodeType) {
     case 'TEXT': return { content: 'Add your text here...', style: { color: 'var(--foreground)', fontSize: '16px', fontWeight: '400', lineHeight: '1.6', textAlign: 'left' } };
     case 'BUTTON': return { content: 'Click Here', href: '#', style: { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' } };
     case 'IMAGE': return { src: 'https://placehold.co/600x400', alt: 'Placeholder', style: { width: '100%', borderRadius: 'var(--radius)' } };
-    case 'CONTAINER': return { style: { paddingTop: '20px', paddingRight: '20px', paddingBottom: '20px', paddingLeft: '20px', backgroundColor: 'transparent' } };
+    case 'CONTAINER': return { style: { paddingTop: '20px', paddingRight: '20px', paddingBottom: '20px', paddingLeft: '20px', backgroundColor: 'transparent', display: 'flex', flexDirection: 'column', gap: '0px', alignItems: 'stretch', justifyContent: 'flex-start' } };
     case 'DIVIDER': return { style: { width: '100%' } };
     case 'SPACER': return { height: '40px', style: {} };
     case 'COLUMNS': return { style: { display: 'flex', gap: '20px', flexDirection: 'row', width: '100%' } };
