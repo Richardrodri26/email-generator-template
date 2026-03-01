@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useAsyncRateLimiter } from "@tanstack/react-pacer/async-rate-limiter";
 import {
   Dialog,
   DialogContent,
@@ -24,20 +25,12 @@ export function TestEmailDialog({ getHtml }: TestEmailDialogProps) {
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [open, setOpen] = useState(false);
 
-  const handleSend = async () => {
-    setSending(true);
-    setResult(null);
-    try {
-      const html = await getHtml();
+  const sendFn = useCallback(
+    async (args: { apiKey: string; to: string; html: string }) => {
       const res = await fetch("/api/send-test-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          apiKey: resendApiKey,
-          to,
-          subject: "Test Email — MailGen",
-          html,
-        }),
+        body: JSON.stringify({ ...args, subject: "Test Email — MailGen" }),
       });
       const json = await res.json();
       if (json.error) {
@@ -45,6 +38,28 @@ export function TestEmailDialog({ getHtml }: TestEmailDialogProps) {
       } else {
         setResult({ ok: true, message: "Email sent successfully!" });
       }
+    },
+    []
+  );
+
+  const rateLimiter = useAsyncRateLimiter(sendFn, {
+    limit: 3,
+    window: 60 * 1000,
+    onReject: (_args, limiter) => {
+      const ms = limiter.getMsUntilNextWindow();
+      setResult({
+        ok: false,
+        message: `Rate limit reached. Try again in ${Math.ceil(ms / 1000)}s.`,
+      });
+    },
+  });
+
+  const handleSend = async () => {
+    setSending(true);
+    setResult(null);
+    try {
+      const html = await getHtml();
+      await rateLimiter.maybeExecute({ apiKey: resendApiKey, to, html });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Unknown error";
       setResult({ ok: false, message });
