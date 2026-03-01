@@ -1,16 +1,25 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { z } from "zod";
+
+const bodySchema = z.object({
+  apiKey: z.string().min(1),
+  to: z.string().email(),
+  subject: z.string().optional(),
+  html: z.string().min(1),
+});
 
 export async function POST(request: Request) {
-  const { apiKey, to, subject, html } = await request.json();
+  const parsed = bodySchema.safeParse(await request.json());
 
-  if (!apiKey || !to || !html) {
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "Missing apiKey, to, or html" },
+      { error: parsed.error.issues[0].message },
       { status: 400 }
     );
   }
 
+  const { apiKey, to, subject, html } = parsed.data;
   const resend = new Resend(apiKey);
 
   try {
@@ -27,7 +36,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, id: data?.id });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[send-test-email]", err);
+    return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
   }
 }
