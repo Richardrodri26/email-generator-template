@@ -10,7 +10,10 @@ import { EditorSidebar } from "@/components/organisms/Editor/Sidebar";
 import { EditorCanvas } from "@/components/organisms/Editor/Canvas";
 import { EditorPropertiesPanel } from "@/components/organisms/Editor/PropertiesPanel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Tag, BarChart2, Moon } from "lucide-react";
+import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Tag, BarChart2, Moon, Eye } from "lucide-react";
+import { DeviceToggle } from "@/components/organisms/Editor/DeviceToggle";
+import { PreviewModal } from "@/components/organisms/Editor/PreviewModal";
+import { usePreviewStore } from "@/application/usePreviewStore";
 import { useEmailDarkModeStore } from "@/application/useEmailDarkModeStore";
 import { LocalStorageTemplateRepository } from "@/infrastructure/repositories/LocalStorageTemplateRepository";
 import { v4 as uuidv4 } from "uuid";
@@ -300,6 +303,16 @@ export default function EditorPage() {
             {previewDark ? "Dark" : "Light"}
           </Button>
 
+          <DeviceToggle />
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => usePreviewStore.getState().setModalOpen(true)}
+          >
+            <Eye className="h-4 w-4 mr-2" /> Preview
+          </Button>
+
           <Button
             size="sm"
             variant="outline"
@@ -358,6 +371,8 @@ export default function EditorPage() {
           })() : null}
         </DragOverlay>
       </DndContext>
+
+      <PreviewModal themeCSS={themeCSS} />
     </div>
   );
 }
