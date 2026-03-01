@@ -5,7 +5,7 @@ import { useEditorStore } from "@/application/useEditorStore";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, BarChart2, TrendingUp, PieChart, Plus, Link2, Link2Off, Bookmark } from "lucide-react";
+import { Trash2, BarChart2, TrendingUp, PieChart, Plus, Link2, Link2Off, Bookmark, ArrowRight, ArrowDown } from "lucide-react";
 import { usePresetsStore } from "@/application/usePresetsStore";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -917,6 +917,80 @@ export function EditorPropertiesPanel() {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── COLUMNS / CONTAINER Layout ── */}
+        {(node.type === "COLUMNS" || node.type === "CONTAINER") && (
+          <div className="space-y-3 border-t border-border pt-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Layout
+            </h3>
+
+            {/* Direction */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Direction</Label>
+              <div className="flex gap-1">
+                {(["row", "column"] as const).map((dir) => (
+                  <button
+                    key={dir}
+                    onClick={() => updateNodeProps(node.id, { style: { ...node.props.style, flexDirection: dir } })}
+                    className={`flex-1 h-9 rounded-md border text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                      (node.props.style?.flexDirection || "row") === dir
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-input bg-transparent text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {dir === "row"
+                      ? <><ArrowRight className="h-3.5 w-3.5" /> Horizontal</>
+                      : <><ArrowDown className="h-3.5 w-3.5" /> Vertical</>
+                    }
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Gap */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Gap</Label>
+              <select
+                value={node.props.style?.gap || "0px"}
+                onChange={(e) => updateNodeProps(node.id, { style: { ...node.props.style, gap: e.target.value } })}
+                className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              >
+                {["0px","4px","8px","12px","16px","20px","24px","32px","40px","48px"].map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Align Items */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Align Items</Label>
+              <select
+                value={node.props.style?.alignItems || "stretch"}
+                onChange={(e) => updateNodeProps(node.id, { style: { ...node.props.style, alignItems: e.target.value } })}
+                className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              >
+                {["stretch","flex-start","center","flex-end","baseline"].map(v => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Justify Content */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Justify Content</Label>
+              <select
+                value={node.props.style?.justifyContent || "flex-start"}
+                onChange={(e) => updateNodeProps(node.id, { style: { ...node.props.style, justifyContent: e.target.value } })}
+                className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              >
+                {["flex-start","center","flex-end","space-between","space-around","space-evenly"].map(v => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
             </div>
           </div>
         )}
