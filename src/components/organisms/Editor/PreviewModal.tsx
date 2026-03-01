@@ -1,8 +1,9 @@
 "use client";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePreviewStore, DEVICE_WIDTHS } from "@/application/usePreviewStore";
 import { useEditorStore } from "@/application/useEditorStore";
-import { generateReactEmailElement } from "@/application/useExportBuilder";
+import { generateHtmlExport } from "@/application/useExportBuilder";
 import { Monitor, Tablet, Smartphone } from "lucide-react";
 
 const DEVICE_ICONS = { desktop: Monitor, tablet: Tablet, mobile: Smartphone };
@@ -17,7 +18,12 @@ export function PreviewModal({ themeCSS }: PreviewModalProps) {
   const data = useEditorStore((s) => s.data);
   const width = DEVICE_WIDTHS[device];
 
-  const emailElement = generateReactEmailElement(data, themeCSS);
+  const [htmlContent, setHtmlContent] = useState("");
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    generateHtmlExport(data, themeCSS).then(setHtmlContent);
+  }, [modalOpen, data, themeCSS]);
 
   return (
     <Dialog open={modalOpen} onOpenChange={setModalOpen}>
@@ -53,9 +59,12 @@ export function PreviewModal({ themeCSS }: PreviewModalProps) {
             style={{ width, transition: "width 300ms ease" }}
             className="bg-white shadow-xl rounded-sm overflow-hidden min-h-40"
           >
-            <div className="email-editor-preview">
-              {emailElement}
-            </div>
+            <iframe
+              srcDoc={htmlContent}
+              className="w-full border-0"
+              style={{ minHeight: "400px", height: "70vh" }}
+              title="Email Preview"
+            />
           </div>
         </div>
       </DialogContent>
