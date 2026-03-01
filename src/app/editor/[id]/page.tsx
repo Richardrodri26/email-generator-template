@@ -304,32 +304,22 @@ export default function EditorPage() {
   const handleExportPdf = async () => {
     setIsExportingPdf(true);
     try {
-      const canvasEl = document.querySelector(".email-editor-preview") as HTMLElement;
-      if (!canvasEl) throw new Error("Canvas element not found");
-
-      // Dynamic import so these only load in the browser
-      const html2canvas = (await import("html2canvas")).default;
-      const { jsPDF } = await import("jspdf");
-
-      const capturedCanvas = await html2canvas(canvasEl, {
-        scale: 2,           // 2x for crisp PDF
-        useCORS: true,      // allow external images
-        logging: false,
-        backgroundColor: "#ffffff",
+      const htmlString = await generateHtmlExport(currentData, themeCSS);
+      const response = await fetch("/api/export-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ html: htmlString, filename: `template-${id}.pdf` }),
       });
-
-      const imgData = capturedCanvas.toDataURL("image/png");
-      const pdfWidth = capturedCanvas.width / 2;   // undo the 2x scale
-      const pdfHeight = capturedCanvas.height / 2;
-
-      const pdf = new jsPDF({
-        orientation: pdfWidth > pdfHeight ? "landscape" : "portrait",
-        unit: "px",
-        format: [pdfWidth, pdfHeight],
-      });
-
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`template-${id}.pdf`);
+      if (!response.ok) throw new Error(await response.text());
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `template-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "PDF export failed";
       alert(message);
