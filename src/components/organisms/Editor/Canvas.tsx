@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, createContext, useContext, Fragment } from "react";
+import { useState, useCallback, createContext, useContext, Fragment, useRef, useEffect } from "react";
+import { SnapLinesOverlay } from "./SnapLinesOverlay";
 import { useEditorStore } from "@/application/useEditorStore";
 import { useEmailDarkModeStore } from "@/application/useEmailDarkModeStore";
 import { usePreviewStore, DEVICE_WIDTHS } from "@/application/usePreviewStore";
@@ -677,6 +678,24 @@ export function EditorCanvas({ themeCSS, overNodeId = null, dropAbove = true, ac
   const { device } = usePreviewStore();
   const previewWidth = DEVICE_WIDTHS[device];
 
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [canvasDims, setCanvasDims] = useState({ w: 600, h: 800 });
+
+  useEffect(() => {
+    const update = () => {
+      if (canvasRef.current) {
+        setCanvasDims({
+          w: canvasRef.current.offsetWidth,
+          h: canvasRef.current.offsetHeight,
+        });
+      }
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (canvasRef.current) observer.observe(canvasRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const scopedCSS = themeCSS
     ? themeCSS
         .replace(/:root/g, ".email-editor-preview")
@@ -693,12 +712,14 @@ export function EditorCanvas({ themeCSS, overNodeId = null, dropAbove = true, ac
 
         {/* 12-col grid overlay guide (visible only while hovering canvas) */}
         <div
+          ref={canvasRef}
           style={{ maxWidth: previewWidth, transition: "max-width 300ms ease" }}
           className={cn(
             "w-full min-h-200 bg-background shadow-xl rounded-sm email-editor-preview flex flex-col relative group/canvas",
             previewDark && "dark"
           )}
         >
+          <SnapLinesOverlay canvasWidth={canvasDims.w} canvasHeight={canvasDims.h} />
           {/* Grid guide lines */}
           <div className="absolute inset-0 pointer-events-none opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-300 z-0">
             <div className="h-full w-full flex">

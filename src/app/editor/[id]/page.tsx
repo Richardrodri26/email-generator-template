@@ -21,6 +21,8 @@ import Link from "next/link";
 import { EditorNodeType } from "@/domain/models/Template";
 import { generateHtmlExport } from "@/application/useExportBuilder";
 import { ThemeInjector } from "@/components/organisms/Editor/ThemeInjector";
+import { useSnapLinesStore } from "@/application/useSnapLinesStore";
+import { getBBoxFromElement, computeSnapLines, type BBox } from "@/application/utils/snapLines";
 
 const repo = new LocalStorageTemplateRepository();
 
@@ -138,6 +140,7 @@ export default function EditorPage() {
     overNodeIdRef.current = null;
     setOverNodeId(null);
     dropAboveRef.current = true;
+    useSnapLinesStore.getState().clear();
     if (isNew) {
       setActiveDragType(active.data.current?.type);
     } else {
@@ -173,9 +176,25 @@ export default function EditorPage() {
       dropAboveRef.current = above;
       setDropAbove(above);
     }
+
+    const activeNodeId = event.active.id as string;
+    const activeEl = document.getElementById(`node-${activeNodeId}`);
+    const canvasEl = document.querySelector(".email-editor-preview") as HTMLElement | null;
+
+    if (activeEl && canvasEl) {
+      const activeBBox = getBBoxFromElement(activeEl, canvasEl);
+      const otherBBoxes: BBox[] = Object.keys(currentData.nodes)
+        .filter((id) => id !== activeNodeId && id !== currentData.rootNodeId)
+        .flatMap((id) => {
+          const el = document.getElementById(`node-${id}`);
+          return el ? [getBBoxFromElement(el, canvasEl)] : [];
+        });
+      useSnapLinesStore.getState().setLines(computeSnapLines(activeBBox, otherBBoxes));
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    useSnapLinesStore.getState().clear();
     setActiveDragType(null);
     setActiveDragId(null);
     overNodeIdRef.current = null;
