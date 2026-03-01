@@ -21,7 +21,7 @@ import Link from "next/link";
 import { EditorNodeType } from "@/domain/models/Template";
 import { generateHtmlExport } from "@/application/useExportBuilder";
 import { ThemeInjector } from "@/components/organisms/Editor/ThemeInjector";
-import { useSnapLinesStore } from "@/application/useSnapLinesStore";
+
 
 const repo = new LocalStorageTemplateRepository();
 
@@ -139,7 +139,6 @@ export default function EditorPage() {
     overNodeIdRef.current = null;
     setOverNodeId(null);
     dropAboveRef.current = true;
-    useSnapLinesStore.getState().clear();
     if (isNew) {
       setActiveDragType(active.data.current?.type);
     } else {
@@ -179,7 +178,6 @@ export default function EditorPage() {
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    useSnapLinesStore.getState().clear();
     setActiveDragType(null);
     setActiveDragId(null);
     overNodeIdRef.current = null;

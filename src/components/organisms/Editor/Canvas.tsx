@@ -216,10 +216,20 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       const startLeft = parseFloat(node.props.style?.left ?? "") || 0;
       const startTop = parseFloat(node.props.style?.top ?? "") || 0;
 
-      // Capture initial bbox once for snap line math (avoids querying DOM per frame)
+      // Snapshot at drag-start: bbox of active element + all peers (one-time DOM read)
       const el = document.getElementById(`node-${nodeId}`);
       const canvasEl = document.querySelector(".email-editor-preview") as HTMLElement | null;
       const initBBox = el && canvasEl ? getBBoxFromElement(el, canvasEl) : null;
+      const rootId = useEditorStore.getState().data.rootNodeId;
+      const otherBBoxes: BBox[] = [];
+      if (canvasEl) {
+        document.querySelectorAll("[id^='node-']").forEach((otherEl) => {
+          const otherId = (otherEl as HTMLElement).id.slice(5);
+          if (otherId !== nodeId && otherId !== rootId) {
+            otherBBoxes.push(getBBoxFromElement(otherEl as HTMLElement, canvasEl));
+          }
+        });
+      }
 
       const move = (ev: PointerEvent) => {
         ev.preventDefault();
@@ -230,7 +240,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
           top: `${startTop + dy}px`,
         });
 
-        if (initBBox && canvasEl) {
+        if (initBBox && canvasEl && otherBBoxes.length > 0) {
           const activeBBox: BBox = {
             left: initBBox.left + dx,
             top: initBBox.top + dy,
@@ -239,14 +249,6 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
             centerX: initBBox.centerX + dx,
             centerY: initBBox.centerY + dy,
           };
-          const rootId = useEditorStore.getState().data.rootNodeId;
-          const otherBBoxes: BBox[] = [];
-          document.querySelectorAll("[id^='node-']").forEach((otherEl) => {
-            const otherId = (otherEl as HTMLElement).id.slice(5); // strip "node-"
-            if (otherId !== nodeId && otherId !== rootId) {
-              otherBBoxes.push(getBBoxFromElement(otherEl as HTMLElement, canvasEl));
-            }
-          });
           useSnapLinesStore.getState().setLines(computeSnapLines(activeBBox, otherBBoxes));
         }
       };
