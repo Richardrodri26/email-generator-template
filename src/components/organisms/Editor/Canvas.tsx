@@ -690,8 +690,10 @@ export function EditorCanvas({ themeCSS, overNodeId = null, dropAbove = true, ac
 
         {/* 12-col grid overlay guide (visible only while hovering canvas) */}
         <div
-          className="w-full max-w-150 min-h-200 bg-background shadow-xl rounded-sm email-editor-preview flex flex-col relative group/canvas"
-          style={{ backgroundColor: previewDark ? "#1a1a1a" : undefined }}
+          className={cn(
+            "w-full max-w-150 min-h-200 bg-background shadow-xl rounded-sm email-editor-preview flex flex-col relative group/canvas",
+            previewDark && "dark"
+          )}
         >
           {/* Grid guide lines */}
           <div className="absolute inset-0 pointer-events-none opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-300 z-0">
