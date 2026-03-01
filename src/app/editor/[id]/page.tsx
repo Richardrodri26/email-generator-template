@@ -10,7 +10,7 @@ import { EditorSidebar } from "@/components/organisms/Editor/Sidebar";
 import { EditorCanvas } from "@/components/organisms/Editor/Canvas";
 import { EditorPropertiesPanel } from "@/components/organisms/Editor/PropertiesPanel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Tag, BarChart2, Moon, Eye } from "lucide-react";
+import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Tag, BarChart2, Moon, Eye, FileText } from "lucide-react";
 import { DeviceToggle } from "@/components/organisms/Editor/DeviceToggle";
 import { PreviewModal } from "@/components/organisms/Editor/PreviewModal";
 import { usePreviewStore } from "@/application/usePreviewStore";
@@ -51,6 +51,7 @@ export default function EditorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [activeDragType, setActiveDragType] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [overNodeId, setOverNodeId] = useState<string | null>(null);
@@ -300,6 +301,42 @@ export default function EditorPage() {
     setIsExporting(false);
   };
 
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
+    try {
+      const canvasEl = document.querySelector(".email-editor-preview") as HTMLElement;
+      if (!canvasEl) throw new Error("Canvas element not found");
+
+      // Dynamic import so these only load in the browser
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+
+      const capturedCanvas = await html2canvas(canvasEl, {
+        scale: 2,           // 2x for crisp PDF
+        useCORS: true,      // allow external images
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = capturedCanvas.toDataURL("image/png");
+      const pdfWidth = capturedCanvas.width / 2;   // undo the 2x scale
+      const pdfHeight = capturedCanvas.height / 2;
+
+      const pdf = new jsPDF({
+        orientation: pdfWidth > pdfHeight ? "landscape" : "portrait",
+        unit: "px",
+        format: [pdfWidth, pdfHeight],
+      });
+
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`template-${id}.pdf`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "PDF export failed";
+      alert(message);
+    }
+    setIsExportingPdf(false);
+  };
+
   return (
     <div className="h-screen w-full flex flex-col bg-card overflow-hidden">
       {/* Header */}
@@ -357,6 +394,11 @@ export default function EditorPage() {
           >
             <Download className="h-4 w-4 mr-2" />
             Export Rendered
+          </Button>
+
+          <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={isExportingPdf}>
+            <FileText className="h-4 w-4 mr-2" />
+            {isExportingPdf ? "Generating PDF..." : "Export PDF"}
           </Button>
 
           <Button
