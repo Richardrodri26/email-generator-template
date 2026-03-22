@@ -10,7 +10,10 @@ import { EditorSidebar } from "@/components/organisms/Editor/Sidebar";
 import { EditorCanvas } from "@/components/organisms/Editor/Canvas";
 import { EditorPropertiesPanel } from "@/components/organisms/Editor/PropertiesPanel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Tag, BarChart2, Moon, Eye, FileText } from "lucide-react";
+import { ArrowLeft, Save, Download, CheckCircle2, Type, MousePointerClick, Image as ImageIcon, LayoutTemplate, Minus, Space, Columns2, Share2, Table2, PanelTop, Tag, BarChart2, Moon, Eye, FileText, Maximize2, AlertTriangle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import { useTemplateDefaultsStore } from "@/application/useTemplateDefaultsStore";
 import { DeviceToggle } from "@/components/organisms/Editor/DeviceToggle";
 import { PreviewModal } from "@/components/organisms/Editor/PreviewModal";
 import { usePreviewStore } from "@/application/usePreviewStore";
@@ -53,6 +56,7 @@ export default function EditorPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [customWidth, setCustomWidth] = useState("");
   const [activeDragType, setActiveDragType] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [overNodeId, setOverNodeId] = useState<string | null>(null);
@@ -69,7 +73,10 @@ export default function EditorPage() {
   const addNode = useEditorStore((state) => state.addNode);
   const moveNode = useEditorStore((state) => state.moveNode);
   const reorderNode = useEditorStore((state) => state.reorderNode);
+  const updateNodeProps = useEditorStore((state) => state.updateNodeProps);
   const currentData = useEditorStore((state) => state.data);
+  const rootNodeId = useEditorStore((state) => state.data.rootNodeId);
+  const rootNode = useEditorStore((state) => state.data.nodes[state.data.rootNodeId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -424,6 +431,90 @@ export default function EditorPage() {
           </Button>
 
           <DeviceToggle />
+
+          {(() => {
+            const currentMaxWidth = rootNode?.props.style?.maxWidth || "600px";
+            const PRESETS = [
+              { label: "Narrow", value: "480px" },
+              { label: "Standard", value: "600px" },
+              { label: "Wide", value: "640px" },
+            ];
+            const applyWidth = (width: string) => {
+              updateNodeProps(rootNodeId, {
+                style: { ...rootNode?.props.style, maxWidth: width },
+              });
+            };
+            const widthNum = parseInt(currentMaxWidth, 10);
+            const showWarning = !isNaN(widthNum) && widthNum > 700;
+            return (
+              <Popover onOpenChange={(open) => { if (open) setCustomWidth(currentMaxWidth); }}>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline" title="Canvas Width">
+                    <Maximize2 className="h-4 w-4 mr-2" />
+                    {currentMaxWidth}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72" align="end">
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold">Canvas Width</p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {PRESETS.map((p) => (
+                        <Button
+                          key={p.value}
+                          size="sm"
+                          variant={currentMaxWidth === p.value ? "default" : "outline"}
+                          className="flex flex-col h-auto py-1.5 text-xs gap-0"
+                          onClick={() => applyWidth(p.value)}
+                        >
+                          <span>{p.value}</span>
+                          <span className="text-[10px] font-normal opacity-70">{p.label}</span>
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customWidth}
+                        onChange={(e) => setCustomWidth(e.target.value)}
+                        placeholder="e.g. 560px"
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none placeholder:text-muted-foreground"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const val = customWidth.trim();
+                          const normalized = /^\d+$/.test(val) ? val + "px" : val;
+                          if (/^\d+(px)?$/.test(val)) {
+                            applyWidth(normalized);
+                          }
+                        }}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                    {(showWarning || parseInt(customWidth) > 700) && (
+                      <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        Widths above 700px may clip in some email clients
+                      </p>
+                    )}
+                    <Separator />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full text-xs"
+                      onClick={() =>
+                        useTemplateDefaultsStore.getState().setDefaultMaxWidth(currentMaxWidth)
+                      }
+                    >
+                      Save as default
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            );
+          })()}
 
           <Button
             size="sm"

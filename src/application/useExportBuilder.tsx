@@ -2,7 +2,7 @@ import { EditorNode, TemplateData } from "@/domain/models/Template";
 import { Html, Body, Head, Tailwind, Text, Button as ReactEmailButton, Img, Container, Section, Hr, Row, Column, Link } from "@react-email/components";
 import { render } from "@react-email/render";
 import * as React from "react";
-import { generateTailwindConfig } from "./utils/cssParser";
+import { generateTailwindConfig, parseShadcnVariables } from "./utils/cssParser";
 
 // ── Simple SVG chart generator (no browser APIs, works server-side) ──
 function generateChartSvg(
@@ -103,16 +103,18 @@ function buildDarkMediaCSS(data: TemplateData): string {
   return `@media (prefers-color-scheme: dark) {\n${rules.join("\n")}\n}`;
 }
 
-// Email canvas reference width (desktop). Used to convert absolute px → % for overlay nodes.
-const EMAIL_CANVAS_WIDTH = 600;
-
 /**
  * Converts a node's style for safe email rendering:
  * - Overlay nodes (position:absolute): converts `left` from px → % so the layout
  *   scales correctly on tablet/mobile in clients that support CSS positioning.
  * - Non-overlay nodes: strips any stale position/left/top/zIndex properties.
+ * @param style - The node's style object
+ * @param canvasWidth - The ROOT node's maxWidth in px (used for overlay left% conversion)
  */
-function buildEmailStyle(style: Record<string, any> | undefined): Record<string, any> {
+function buildEmailStyle(
+  style: Record<string, any> | undefined,
+  canvasWidth = 600
+): Record<string, any> {
   if (!style) return {};
   if (style.position !== "absolute") {
     const { position: _p, left: _l, top: _t, zIndex: _z, ...clean } = style;
@@ -121,7 +123,7 @@ function buildEmailStyle(style: Record<string, any> | undefined): Record<string,
   const leftPx = parseFloat(style.left ?? "0") || 0;
   return {
     ...style,
-    left: `${((leftPx / EMAIL_CANVAS_WIDTH) * 100).toFixed(2)}%`,
+    left: `${((leftPx / canvasWidth) * 100).toFixed(2)}%`,
   };
 }
 
@@ -130,14 +132,60 @@ function hasOverlayChildren(node: EditorNode, nodes: Record<string, EditorNode>)
   return node.children.some(id => nodes[id]?.props.style?.position === "absolute");
 }
 
+const SHADCN_FALLBACKS: Record<string, string> = {
+  "primary": "#f97316",
+  "primary-foreground": "#ffffff",
+  "secondary": "#f1f5f9",
+  "secondary-foreground": "#0f172a",
+  "muted": "#f1f5f9",
+  "muted-foreground": "#64748b",
+  "background": "#ffffff",
+  "foreground": "#0f172a",
+  "destructive": "#ef4444",
+  "border": "#e2e8f0",
+  "card": "#ffffff",
+  "card-foreground": "#0f172a",
+  "accent": "#f1f5f9",
+  "accent-foreground": "#0f172a",
+};
+
+function resolveVars(
+  style: Record<string, any> | undefined,
+  vars: Record<string, string>
+): Record<string, any> {
+  if (!style) return {};
+  const resolved: Record<string, any> = {};
+  for (const [key, value] of Object.entries(style)) {
+    if (typeof value === "string") {
+      const match = value.match(/^var\(--([^)]+)\)/);
+      if (match) {
+        const varName = match[1];
+        resolved[key] = vars[varName] ?? SHADCN_FALLBACKS[varName] ?? value;
+      } else {
+        resolved[key] = value;
+      }
+    } else {
+      resolved[key] = value;
+    }
+  }
+  return resolved;
+}
+
 export function generateReactEmailElement(data: TemplateData, themeCSS: string = "") {
+  const cssVars = parseShadcnVariables(themeCSS);
+  const allVars = { ...SHADCN_FALLBACKS, ...cssVars };
+
+  // Derive canvas width from the ROOT node's maxWidth for accurate overlay left% conversion
+  const rootNode = Object.values(data.nodes).find((n) => n.type === "ROOT");
+  const canvasWidth = parseFloat(rootNode?.props.style?.maxWidth ?? "600") || 600;
+
   const renderNode = (nodeId: string): React.ReactNode => {
     const node = data.nodes[nodeId];
     if (!node) return null;
 
     const children = node.children.map(renderNode);
     const isOverlay = node.props.style?.position === "absolute";
-    const emailStyle = buildEmailStyle(node.props.style);
+    const emailStyle = resolveVars(buildEmailStyle(node.props.style, canvasWidth), allVars);
 
     switch (node.type) {
       case "TEXT":
@@ -153,11 +201,12 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
             data-node-id={node.id}
             href={node.props.href}
             style={{
-              borderRadius: "6px",
+              borderRadius: allVars["radius"] || "6px",
               fontWeight: "600",
               fontSize: "14px",
               textAlign: "center",
               display: "inline-block",
+              boxSizing: "border-box",
               // Full-width only for non-overlay buttons; overlay buttons use their own width
               ...(isOverlay ? {} : { width: "100%" }),
               ...emailStyle,
@@ -209,7 +258,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
       case "COLUMNS":
         // Wrapping children into columns
         return (
-          <Row key={node.id} data-node-id={node.id} style={node.props.style}>
+          <Row key={node.id} data-node-id={node.id} style={emailStyle}>
             {node.children.map((childId) => (
               <Column key={childId}>{renderNode(childId)}</Column>
             ))}
@@ -217,7 +266,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         );
       case "SOCIAL":
         return (
-          <Row key={node.id} data-node-id={node.id} style={{ padding: "10px", ...node.props.style }}>
+          <Row key={node.id} data-node-id={node.id} style={{ padding: "10px", ...emailStyle }}>
             <Column align="center">
               <Link href="#" style={{ display: "inline-block", padding: "8px", margin: "0 4px", backgroundColor: "#3b5998", color: "white", borderRadius: "50%", width: "16px", height: "16px", textAlign: "center", textDecoration: "none", lineHeight: "16px" }}>f</Link>
               <Link href="#" style={{ display: "inline-block", padding: "8px", margin: "0 4px", backgroundColor: "#1da1f2", color: "white", borderRadius: "50%", width: "16px", height: "16px", textAlign: "center", textDecoration: "none", lineHeight: "16px" }}>t</Link>
@@ -227,7 +276,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         );
       case "CARD":
         return (
-          <Section key={node.id} data-node-id={node.id} style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", ...node.props.style }}>
+          <Section key={node.id} data-node-id={node.id} style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", ...emailStyle }}>
             {node.props.cardTitle && (
               <Section style={{ padding: "24px 24px 0 24px" }}>
                 <Text style={{ fontSize: "16px", fontWeight: "600", margin: "0" }}>{node.props.cardTitle}</Text>
@@ -245,7 +294,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         const headers = node.props.headers || ["Header 1", "Header 2", "Header 3"];
         const rows = node.props.rows || [["Cell 1", "Cell 2", "Cell 3"]];
         return (
-          <Section key={node.id} data-node-id={node.id} style={{ width: "100%", ...node.props.style }}>
+          <Section key={node.id} data-node-id={node.id} style={{ width: "100%", ...emailStyle }}>
             <Row style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
               {headers.map((h: string, i: number) => (
                 <Column key={i} style={{ padding: "12px 16px", fontSize: "12px", fontWeight: "500", color: "#6b7280", textTransform: "uppercase" as const }}>{h}</Column>
@@ -281,7 +330,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
               fontWeight: "600",
               lineHeight: "1.5",
               ...variantStyles[v],
-              ...node.props.style,
+              ...emailStyle,
             }}
           >
             {node.props.content || "Badge"}
@@ -299,7 +348,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
         const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
 
         return (
-          <Section key={node.id} data-node-id={node.id} style={{ width: "100%", ...node.props.style }}>
+          <Section key={node.id} data-node-id={node.id} style={{ width: "100%", ...emailStyle }}>
             {node.props.chartTitle && (
               <Text style={{ fontSize: "14px", fontWeight: "600", margin: "0 0 8px 0" }}>
                 {node.props.chartTitle}
@@ -315,7 +364,7 @@ export function generateReactEmailElement(data: TemplateData, themeCSS: string =
             key={node.id}
             data-node-id={node.id}
             style={{
-              ...node.props.style,
+              ...emailStyle,
               ...(hasOverlayChildren(node, data.nodes) ? { position: "relative" as const } : {}),
             }}
           >

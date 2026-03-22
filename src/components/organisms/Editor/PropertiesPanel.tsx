@@ -505,10 +505,33 @@ export function EditorPropertiesPanel() {
             </div>
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">Alt Text</Label>
-              <Input 
-                value={node.props.alt || ""} 
+              <Input
+                value={node.props.alt || ""}
                 onChange={(e) => handleChange("alt", e.target.value)}
               />
+            </div>
+            {/* Size */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Width</Label>
+                <Input
+                  value={node.props.style?.width || ""}
+                  placeholder="e.g. 100% or 600px"
+                  onChange={(e) =>
+                    handleStyleChange("width", e.target.value)
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Height</Label>
+                <Input
+                  value={node.props.style?.height || ""}
+                  placeholder="e.g. 200px"
+                  onChange={(e) =>
+                    handleStyleChange("height", e.target.value)
+                  }
+                />
+              </div>
             </div>
           </div>
         )}
@@ -868,6 +891,16 @@ export function EditorPropertiesPanel() {
                   value={node.props.style?.padding || "0px"}
                   onChange={(e) => handleStyleChange("padding", e.target.value)}
                   placeholder="e.g. 20px"
+                />
+              </div>
+            )}
+            {node.type === "ROOT" && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Canvas Width</Label>
+                <Input
+                  value={node.props.style?.maxWidth || "600px"}
+                  onChange={(e) => handleStyleChange("maxWidth", e.target.value)}
+                  placeholder="600px"
                 />
               </div>
             )}

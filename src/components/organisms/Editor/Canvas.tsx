@@ -1,6 +1,16 @@
 "use client";
 
 import { useState, useCallback, createContext, useContext, Fragment } from "react";
+import { v4 as uuidv4 } from "uuid";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuLabel,
+} from "@/components/ui/context-menu";
+import { cloneNodeSubtree } from "@/application/utils/cloneNodeSubtree";
 import { SnapLinesOverlay } from "./SnapLinesOverlay";
 import { useSnapLinesStore } from "@/application/useSnapLinesStore";
 import { getBBoxFromElement, computeSnapLines, type BBox } from "@/application/utils/snapLines";
@@ -27,12 +37,14 @@ interface EdgeDropZoneProps {
 }
 
 function EdgeDropZone({ id }: EdgeDropZoneProps) {
+  const flexDirection = useContext(FlexDirectionContext);
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "h-5 w-full pointer-events-auto transition-colors relative z-20",
+        "pointer-events-auto transition-colors relative z-20",
+        flexDirection === "row" ? "w-5 self-stretch" : "h-5 w-full",
         isOver ? "bg-primary/40 rounded" : "bg-transparent"
       )}
     />
@@ -52,6 +64,10 @@ export const EditorDragContext = createContext<DragState>({
   activeDragId: null,
 });
 
+// ─── Flex Direction Context ───────────────────────────────────────────
+type FlexDirection = "row" | "column";
+const FlexDirectionContext = createContext<FlexDirection>("column");
+
 // ─── Drop Indicator ───────────────────────────────────────────────────
 function DropIndicator() {
   return (
@@ -63,7 +79,7 @@ function DropIndicator() {
     </div>
   );
 }
-import { Plus, ImageIcon } from "lucide-react";
+import { Plus, ImageIcon, Trash2, Copy, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -130,6 +146,93 @@ function ContainerChildren({ childIds, nodeId: _parentId }: { childIds: string[]
           </Fragment>
         );
       })}
+    </>
+  );
+}
+
+// ─── Context Menu Items ───────────────────────────────────────────────
+const DUPLICABLE_TYPES = new Set([
+  "TEXT", "BUTTON", "IMAGE", "CONTAINER", "DIVIDER",
+  "SPACER", "SOCIAL", "CARD", "TABLE", "BADGE", "CHART",
+]);
+
+function NodeContextMenuItems({ nodeId }: { nodeId: string }) {
+  const nodes = useEditorStore((s) => s.data.nodes);
+  const node = nodes[nodeId];
+  const removeNode = useEditorStore((s) => s.removeNode);
+  const addNode = useEditorStore((s) => s.addNode);
+  const selectNode = useEditorStore((s) => s.selectNode);
+
+  if (!node) return null;
+
+  const parentEntry = Object.entries(nodes).find(([, n]) => n.children.includes(nodeId));
+  const parentId = parentEntry?.[0] ?? null;
+  const parentNode = parentEntry?.[1] ?? null;
+
+  const canDuplicate = DUPLICABLE_TYPES.has(node.type);
+  const isColumns = node.type === "COLUMNS";
+
+  const handleDuplicate = () => {
+    if (!parentId || !parentNode) return;
+    const { rootId, clonedNodes } = cloneNodeSubtree(nodeId, nodes);
+    if (!clonedNodes.length) return;
+    const [rootClone, ...rest] = clonedNodes;
+    const insertIndex = parentNode.children.indexOf(nodeId) + 1;
+    addNode(parentId, rootClone, insertIndex, rest);
+    selectNode(rootId);
+  };
+
+  const handleAddColumn = () => {
+    const newColId = uuidv4();
+    addNode(nodeId, {
+      id: newColId,
+      type: "CONTAINER",
+      props: {
+        style: {
+          flex: "1",
+          minHeight: "80px",
+          paddingTop: "12px",
+          paddingRight: "12px",
+          paddingBottom: "12px",
+          paddingLeft: "12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0px",
+          alignItems: "stretch",
+          justifyContent: "flex-start",
+        },
+      },
+      children: [],
+    });
+  };
+
+  return (
+    <>
+      <ContextMenuLabel>{node.type}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      {parentId && (
+        <ContextMenuItem onClick={() => selectNode(parentId)}>
+          <ArrowUp className="size-4" />
+          Select Parent
+        </ContextMenuItem>
+      )}
+      {canDuplicate && (
+        <ContextMenuItem onClick={handleDuplicate}>
+          <Copy className="size-4" />
+          Duplicate
+        </ContextMenuItem>
+      )}
+      {isColumns && (
+        <ContextMenuItem onClick={handleAddColumn}>
+          <Plus className="size-4" />
+          Add Column
+        </ContextMenuItem>
+      )}
+      <ContextMenuSeparator />
+      <ContextMenuItem variant="destructive" onClick={() => removeNode(nodeId)}>
+        <Trash2 className="size-4" />
+        Delete
+      </ContextMenuItem>
     </>
   );
 }
@@ -443,16 +546,28 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       </div>
     );
 
+    const wrappedEl =
+      node.type !== "ROOT" ? (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>{nodeEl}</ContextMenuTrigger>
+          <ContextMenuContent>
+            <NodeContextMenuItems nodeId={nodeId} />
+          </ContextMenuContent>
+        </ContextMenu>
+      ) : (
+        nodeEl
+      );
+
     if (isEdgeDropContainer) {
       return (
         <Fragment>
           <EdgeDropZone id={`drop-before-${nodeId}`} />
-          {nodeEl}
+          {wrappedEl}
           <EdgeDropZone id={`drop-after-${nodeId}`} />
         </Fragment>
       );
     }
-    return nodeEl;
+    return wrappedEl;
   };
 
   // ── Per-type rendering ─────────────────────────────────────────────
@@ -606,10 +721,17 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       return wrapWithSelection(
         isPlaceholder ? (
           <div
-            style={{ width: merged.width || "100%" }}
-            className="flex flex-col items-center justify-center gap-3 bg-muted/50 border border-dashed border-border rounded-[var(--radius)] text-muted-foreground py-14"
+            style={{
+              width: merged.width || "100%",
+              height: merged.height || "200px",
+              minHeight: "80px",
+            }}
+            className="flex flex-col items-center justify-center gap-3 bg-muted/50 border border-dashed border-border rounded-[var(--radius)] text-muted-foreground"
           >
             <ImageIcon className="h-10 w-10 opacity-25" />
+            <span className="text-xs font-mono text-muted-foreground/70 select-none bg-muted px-2 py-0.5 rounded">
+              {merged.width || "100%"} × {merged.height || "200px"}
+            </span>
             <span className="text-xs text-muted-foreground/60 select-none">
               Set an image URL in the properties panel →
             </span>
@@ -650,21 +772,23 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     /* ── Columns ── */
     case "COLUMNS":
       return wrapWithSelection(
-        <SortableContext
-          items={node.children}
-          strategy={verticalListSortingStrategy}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: "16px",
-              width: "100%",
-              ...merged,
-            }}
+        <FlexDirectionContext.Provider value="row">
+          <SortableContext
+            items={node.children}
+            strategy={verticalListSortingStrategy}
           >
-            <ContainerChildren nodeId={nodeId} childIds={node.children} />
-          </div>
-        </SortableContext>,
+            <div
+              style={{
+                display: "flex",
+                gap: "16px",
+                width: "100%",
+                ...merged,
+              }}
+            >
+              <ContainerChildren nodeId={nodeId} childIds={node.children} />
+            </div>
+          </SortableContext>
+        </FlexDirectionContext.Provider>,
       );
 
     /* ── Social ── */
@@ -885,10 +1009,12 @@ interface EditorCanvasProps {
 
 export function EditorCanvas({ themeCSS, overNodeId = null, dropAbove = true, activeDragId = null }: EditorCanvasProps) {
   const rootNodeId = useEditorStore((s) => s.data.rootNodeId);
+  const rootNode = useEditorStore((s) => s.data.nodes[s.data.rootNodeId]);
   const selectNode = useEditorStore((s) => s.selectNode);
   const { previewDark } = useEmailDarkModeStore();
   const { device } = usePreviewStore();
-  const previewWidth = DEVICE_WIDTHS[device];
+  const rootMaxWidth = rootNode?.props.style?.maxWidth || "600px";
+  const previewWidth = device === "desktop" ? rootMaxWidth : DEVICE_WIDTHS[device];
 
   const scopedCSS = themeCSS
     ? themeCSS

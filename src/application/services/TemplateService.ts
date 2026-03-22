@@ -13,7 +13,11 @@ export class TemplateService {
     return this.repository.getTemplateById(id);
   }
 
-  async createTemplate(name: string, authorId: string): Promise<Template> {
+  async createTemplate(
+    name: string,
+    authorId: string,
+    defaults?: { maxWidth?: string }
+  ): Promise<Template> {
     const newTemplate: Template = {
       id: uuidv4(),
       name,
@@ -27,7 +31,11 @@ export class TemplateService {
             id: "root",
             type: "ROOT",
             props: {
-              style: { backgroundColor: "#ffffff", padding: "20px" },
+              style: {
+                backgroundColor: "#ffffff",
+                padding: "20px",
+                maxWidth: defaults?.maxWidth ?? "600px",
+              },
             },
             children: [],
           },

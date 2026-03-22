@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { TemplateService } from "@/application/services/TemplateService";
 import { Template } from "@/domain/models/Template";
+import { useTemplateDefaultsStore } from "@/application/useTemplateDefaultsStore";
 
 export function useTemplatesQuery(
   service: TemplateService,
@@ -30,7 +31,8 @@ export function useCreateTemplateMutation(
   return useMutation({
     mutationFn: async (name: string) => {
       if (!userId) throw new Error("User ID is required to create a template");
-      return service.createTemplate(name, userId);
+      const { defaultMaxWidth } = useTemplateDefaultsStore.getState();
+      return service.createTemplate(name, userId, { maxWidth: defaultMaxWidth });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
