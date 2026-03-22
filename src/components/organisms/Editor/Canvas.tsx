@@ -14,8 +14,30 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+
+// ─── Container types that get EdgeDropZones ──────────────────────────
+const EDGE_DROP_CONTAINER_TYPES = new Set(["CONTAINER", "CARD", "COLUMNS"]);
+
+// ─── EdgeDropZone ─────────────────────────────────────────────────────
+interface EdgeDropZoneProps {
+  id: string;
+}
+
+function EdgeDropZone({ id }: EdgeDropZoneProps) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "h-5 w-full pointer-events-auto transition-colors relative z-20",
+        isOver ? "bg-primary/40 rounded" : "bg-transparent"
+      )}
+    />
+  );
+}
 
 // ─── Drag State Context ───────────────────────────────────────────────
 interface DragState {
@@ -131,6 +153,8 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     height?: string;
   } | null>(null);
   const [localPosition, setLocalPosition] = useState<{ left: string; top: string } | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState<string>("");
 
   if (!node) return null;
 
@@ -158,7 +182,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       nodeId,
       acceptsChildren: isContainer,
     },
-    disabled: node.type === "ROOT" || isAbsolute,
+    disabled: node.type === "ROOT" || isAbsolute || isEditing,
   });
 
   const handleClick = (e: React.MouseEvent) => {
@@ -314,107 +338,122 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     "";
 
   // ── Wrapper ────
-  const wrapWithSelection = (children: React.ReactNode) => (
-    <div
-      id={`node-${nodeId}`}
-      ref={setNodeRef}
-      onClick={handleClick}
-      className={[
-        "relative group/node transition-shadow",
-        nodeRoundedClass,
-        isSelected
-          ? "ring-2 ring-primary ring-offset-2 z-10"
-          : "hover:ring-1 hover:ring-muted-foreground/30",
-        isOver && isContainer
-          ? "outline-2 outline-dashed outline-primary bg-primary/5"
-          : "",
-        node.type === "ROOT"
-          ? "flex flex-col flex-1 w-full"
-          : "",
-        isAbsolute ? "cursor-move" : "",
-      ].join(" ")}
-      style={{
-        ...merged,
-        ...draggingStyle,
-        minHeight:
+  const isEdgeDropContainer = EDGE_DROP_CONTAINER_TYPES.has(node.type);
+
+  const wrapWithSelection = (children: React.ReactNode) => {
+    const nodeEl = (
+      <div
+        id={`node-${nodeId}`}
+        ref={setNodeRef}
+        onClick={handleClick}
+        className={[
+          "relative group/node transition-shadow",
+          nodeRoundedClass,
+          isSelected
+            ? "ring-2 ring-primary ring-offset-2 z-10"
+            : "hover:ring-1 hover:ring-muted-foreground/30",
+          isOver && isContainer
+            ? "outline-2 outline-dashed outline-primary bg-primary/5"
+            : "",
           node.type === "ROOT"
-            ? "100%"
-            : isContainer && node.children.length === 0
-              ? "80px"
-              : undefined,
-        position: isAbsolute ? "absolute" : "relative",
-        ...(isAbsolute ? {
-          touchAction: "none",
-          left: merged.left || "0px",
-          top: merged.top || "0px",
-          zIndex: Number(merged.zIndex) || 10,
-        } : {}),
-        ...(node.type === "BUTTON" ? { minWidth: "max-content" } : {}),
-      }}
-      {...(node.type !== "ROOT" && !isAbsolute ? attributes : {})}
-      {...(node.type !== "ROOT" && !isAbsolute ? listeners : {})}
-      {...(isAbsolute ? { onPointerDown: startDragPosition } : {})}
-    >
-      {/* ── Label (visible on hover + selection) ── */}
-      {node.type !== "ROOT" && (
-        <div className={cn(
-          "absolute -top-6 left-0 flex items-center gap-1.5 z-20 pointer-events-none",
-          "opacity-0 group-hover/node:opacity-100 transition-opacity",
-          isSelected && "opacity-100"
-        )}>
-          <span className={cn(
-            "text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-t-md",
-            isSelected
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground border border-border"
+            ? "flex flex-col flex-1 w-full"
+            : "",
+          isAbsolute ? "cursor-move" : "",
+        ].join(" ")}
+        style={{
+          ...merged,
+          ...draggingStyle,
+          minHeight:
+            node.type === "ROOT"
+              ? "100%"
+              : isContainer && node.children.length === 0
+                ? "80px"
+                : undefined,
+          position: isAbsolute ? "absolute" : "relative",
+          ...(isAbsolute ? {
+            touchAction: "none",
+            left: merged.left || "0px",
+            top: merged.top || "0px",
+            zIndex: Number(merged.zIndex) || 10,
+          } : {}),
+          ...(node.type === "BUTTON" ? { minWidth: "max-content" } : {}),
+        }}
+        {...(node.type !== "ROOT" && !isAbsolute ? attributes : {})}
+        {...(node.type !== "ROOT" && !isAbsolute ? listeners : {})}
+        {...(isAbsolute ? { onPointerDown: startDragPosition } : {})}
+      >
+        {/* ── Label (visible on hover + selection) ── */}
+        {node.type !== "ROOT" && (
+          <div className={cn(
+            "absolute -top-6 left-0 flex items-center gap-1.5 z-20 pointer-events-none",
+            "opacity-0 group-hover/node:opacity-100 transition-opacity",
+            isSelected && "opacity-100"
           )}>
-            {node.type}
-          </span>
-          {isSelected && widthLabel && (
-            <span className="bg-muted text-muted-foreground text-[10px] font-mono px-1.5 py-0.5 rounded-sm">
-              {widthLabel}
+            <span className={cn(
+              "text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-t-md",
+              isSelected
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground border border-border"
+            )}>
+              {node.type}
             </span>
-          )}
-          {isAbsolute && (
-            <span className="text-[9px] font-mono bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700 px-1 py-0.5 rounded ml-1">
-              floating
-            </span>
-          )}
-        </div>
-      )}
+            {isSelected && widthLabel && (
+              <span className="bg-muted text-muted-foreground text-[10px] font-mono px-1.5 py-0.5 rounded-sm">
+                {widthLabel}
+              </span>
+            )}
+            {isAbsolute && (
+              <span className="text-[9px] font-mono bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700 px-1 py-0.5 rounded ml-1">
+                floating
+              </span>
+            )}
+          </div>
+        )}
 
-      {/* ── Resize handles (pill-shaped, visible on selection) ── */}
-      {isSelected && node.type !== "ROOT" && (
-        <>
-          {/* Right handle — pill vertical */}
-          <div
-            className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-2.5 h-7 bg-primary rounded-full cursor-e-resize z-20 shadow border-2 border-background"
-            onPointerDown={(e) => startResize(e, "h")}
-          />
-          {/* Bottom handle — pill horizontal */}
-          <div
-            className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-7 h-2.5 bg-primary rounded-full cursor-s-resize z-20 shadow border-2 border-background"
-            onPointerDown={(e) => startResize(e, "v")}
-          />
-          {/* Corner handle */}
-          <div
-            className="absolute -right-2 -bottom-2 w-4 h-4 bg-primary rounded-full cursor-se-resize z-20 shadow border-2 border-background"
-            onPointerDown={(e) => startResize(e, "both")}
-          />
-        </>
-      )}
+        {/* ── Resize handles (pill-shaped, visible on selection) ── */}
+        {isSelected && node.type !== "ROOT" && (
+          <>
+            {/* Right handle — pill vertical */}
+            <div
+              className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-2.5 h-7 bg-primary rounded-full cursor-e-resize z-20 shadow border-2 border-background"
+              onPointerDown={(e) => startResize(e, "h")}
+            />
+            {/* Bottom handle — pill horizontal */}
+            <div
+              className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-7 h-2.5 bg-primary rounded-full cursor-s-resize z-20 shadow border-2 border-background"
+              onPointerDown={(e) => startResize(e, "v")}
+            />
+            {/* Corner handle */}
+            <div
+              className="absolute -right-2 -bottom-2 w-4 h-4 bg-primary rounded-full cursor-se-resize z-20 shadow border-2 border-background"
+              onPointerDown={(e) => startResize(e, "both")}
+            />
+          </>
+        )}
 
-      {children}
+        {children}
 
-      {/* Empty container placeholder */}
-      {isContainer && node.children.length === 0 && (
-        <div className="text-muted-foreground/60 text-sm text-center py-10 w-full flex flex-col items-center gap-2 border-2 border-dashed border-muted-foreground/20 rounded-md pointer-events-none select-none">
-          <Plus className="h-5 w-5 text-muted-foreground/30" />
-          <span>Drag a block here</span>
-        </div>
-      )}
-    </div>
-  );
+        {/* Empty container placeholder */}
+        {isContainer && node.children.length === 0 && (
+          <div className="text-muted-foreground/60 text-sm text-center py-10 w-full flex flex-col items-center gap-2 border-2 border-dashed border-muted-foreground/20 rounded-md pointer-events-none select-none">
+            <Plus className="h-5 w-5 text-muted-foreground/30" />
+            <span>Drag a block here</span>
+          </div>
+        )}
+      </div>
+    );
+
+    if (isEdgeDropContainer) {
+      return (
+        <Fragment>
+          <EdgeDropZone id={`drop-before-${nodeId}`} />
+          {nodeEl}
+          <EdgeDropZone id={`drop-after-${nodeId}`} />
+        </Fragment>
+      );
+    }
+    return nodeEl;
+  };
 
   // ── Per-type rendering ─────────────────────────────────────────────
   switch (node.type) {
@@ -423,14 +462,62 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       const displayContent = previewSubstitution
         ? substituteVars(node.props.content || "", varData)
         : node.props.content;
+
+      const commitText = () => {
+        updateNodeProps(nodeId, { content: draft });
+        setIsEditing(false);
+      };
+      const revertText = () => {
+        setIsEditing(false);
+      };
+
       return wrapWithSelection(
-        <div style={merged} className="text-foreground">
-          {displayContent || (
-            <span className="italic text-muted-foreground/50 text-sm select-none">
-              Edit text in the properties panel →
-            </span>
-          )}
-        </div>,
+        isEditing ? (
+          <textarea
+            autoFocus
+            value={draft}
+            className="w-full bg-transparent border-none outline-none resize-none p-0 m-0"
+            style={{
+              fontSize: merged.fontSize,
+              fontFamily: merged.fontFamily,
+              color: merged.color,
+              fontWeight: merged.fontWeight,
+              lineHeight: merged.lineHeight,
+              textAlign: merged.textAlign as React.CSSProperties["textAlign"],
+              overflow: "hidden",
+            }}
+            onInput={(e) => {
+              e.currentTarget.style.height = "auto";
+              e.currentTarget.style.height = e.currentTarget.scrollHeight + "px";
+            }}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitText}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                commitText();
+              } else if (e.key === "Escape") {
+                revertText();
+              }
+            }}
+          />
+        ) : (
+          <div
+            style={merged}
+            className="text-foreground"
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(true);
+              setDraft(node.props.content ?? "");
+            }}
+          >
+            {displayContent || (
+              <span className="italic text-muted-foreground/50 text-sm select-none">
+                Edit text in the properties panel →
+              </span>
+            )}
+          </div>
+        ),
       );
     }
 
@@ -445,17 +532,70 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       const customColor = merged.color && !SHADCN_DEFAULTS.includes(merged.color)
         ? merged.color : undefined;
 
+      const commitButton = () => {
+        updateNodeProps(nodeId, { content: draft });
+        setIsEditing(false);
+      };
+      const revertButton = () => {
+        setIsEditing(false);
+      };
+
       return wrapWithSelection(
-        <Button
-          style={{
-            backgroundColor: customBg,
-            color: customColor,
-            width: "100%",
-          }}
-          className="pointer-events-none"
-        >
-          {node.props.content || "Button"}
-        </Button>,
+        isEditing ? (
+          <div
+            style={{
+              backgroundColor: customBg ?? "var(--primary)",
+              color: customColor ?? "var(--primary-foreground)",
+              width: "100%",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "var(--radius)",
+              padding: "8px 16px",
+            }}
+          >
+            <input
+              autoFocus
+              type="text"
+              value={draft}
+              className="bg-transparent border-none outline-none text-center w-full"
+              style={{
+                color: "inherit",
+                fontSize: merged.fontSize,
+                fontWeight: merged.fontWeight,
+              }}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitButton}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitButton();
+                } else if (e.key === "Escape") {
+                  revertButton();
+                }
+              }}
+            />
+          </div>
+        ) : (
+          <div
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(true);
+              setDraft(node.props.content ?? "");
+            }}
+          >
+            <Button
+              style={{
+                backgroundColor: customBg,
+                color: customColor,
+                width: "100%",
+              }}
+              className="pointer-events-none"
+            >
+              {node.props.content || "Button"}
+            </Button>
+          </div>
+        ),
       );
     }
 

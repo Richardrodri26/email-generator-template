@@ -193,6 +193,40 @@ export default function EditorPage() {
 
     const isNew = active.data.current?.isNew;
     const overId = over.id as string;
+
+    // ── Handle edge drop zones (drop-before / drop-after container nodes) ──
+    if (overId.startsWith("drop-before-") || overId.startsWith("drop-after-")) {
+      const isBefore = overId.startsWith("drop-before-");
+      const targetNodeId = isBefore
+        ? overId.slice("drop-before-".length)
+        : overId.slice("drop-after-".length);
+
+      // Find the parent node that contains targetNodeId as a child
+      const parentEntry = Object.entries(currentData!.nodes).find(
+        ([, node]) => node.children.includes(targetNodeId)
+      );
+      if (!parentEntry) return;
+      const [parentId, parentNode] = parentEntry;
+      const targetIndex = parentNode.children.indexOf(targetNodeId);
+      const edgeInsertIndex = isBefore ? targetIndex : targetIndex + 1;
+
+      if (isNew) {
+        const type = active.data.current?.type as EditorNodeType;
+        const presetProps = active.data.current?.presetProps;
+        addNode(parentId, {
+          id: uuidv4(),
+          type,
+          props: presetProps ?? getDefaultProps(type),
+          children: [],
+        }, edgeInsertIndex);
+      } else {
+        if (active.id !== targetNodeId) {
+          moveNode(active.id as string, parentId, edgeInsertIndex);
+        }
+      }
+      return;
+    }
+
     const overNode = currentData?.nodes[overId];
     const isOverContainer = overNode ? CONTAINER_TYPES.has(overNode.type) : false;
 
@@ -264,8 +298,8 @@ export default function EditorPage() {
     } else {
       if (active.id !== over.id) {
         if (isOverContainer) {
-          // Drop directly into container
-          moveNode(active.id as string, parentId, 0);
+          // Drop directly into container — append at end (was incorrectly hardcoded to 0)
+          moveNode(active.id as string, parentId, overNode!.children.length);
         } else {
           const activeParentId = Object.keys(currentData!.nodes).find(
             (key) => currentData!.nodes[key].children.includes(active.id as string)
