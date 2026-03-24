@@ -3,6 +3,24 @@ import { immer } from "zustand/middleware/immer";
 import { EditorNode, TemplateData } from "@/domain/models/Template";
 import { arrayMove } from "@dnd-kit/sortable";
 
+// Distribute equal widths to all direct children of a COLUMNS node.
+// Called whenever children are added, moved, or removed.
+function redistributeEqualWidths(
+  nodes: Record<string, EditorNode>,
+  columnsId: string,
+): void {
+  const col = nodes[columnsId];
+  if (!col || col.type !== "COLUMNS" || col.children.length === 0) return;
+  col.children.forEach((cid) => {
+    const child = nodes[cid];
+    if (!child) return;
+    child.props = {
+      ...child.props,
+      style: { ...child.props.style, flex: "1", width: undefined },
+    };
+  });
+}
+
 interface EditorState {
   data: TemplateData;
   selectedNodeId: string | null;
@@ -69,6 +87,9 @@ export const useEditorStore = create<EditorState>()(
           } else {
             parent.children.push(node.id);
           }
+          if (parent.type === "COLUMNS") {
+            redistributeEqualWidths(state.data.nodes, parentId);
+          }
         }
 
         // Save to history
@@ -97,6 +118,9 @@ export const useEditorStore = create<EditorState>()(
           oldParent.children = oldParent.children.filter(
             (childId) => childId !== id,
           );
+          if (oldParent.type === "COLUMNS") {
+            redistributeEqualWidths(state.data.nodes, currentParentId);
+          }
         }
 
         // Add to new parent
@@ -104,6 +128,9 @@ export const useEditorStore = create<EditorState>()(
         if (newParent) {
           const insertIndex = newIndex ?? newParent.children.length;
           newParent.children.splice(insertIndex, 0, id);
+          if (newParent.type === "COLUMNS") {
+            redistributeEqualWidths(state.data.nodes, newParentId);
+          }
         }
 
         // Save to history
@@ -171,16 +198,22 @@ export const useEditorStore = create<EditorState>()(
         };
 
         // Remove from parent's children list
-        for (const parent of Object.values(state.data.nodes)) {
+        let removedFromColumnsId: string | null = null;
+        for (const [pid, parent] of Object.entries(state.data.nodes)) {
           if (parent.children.includes(id)) {
             parent.children = parent.children.filter(
               (childId) => childId !== id,
             );
+            if (parent.type === "COLUMNS") removedFromColumnsId = pid;
             break;
           }
         }
 
         removeRecursively(id);
+
+        if (removedFromColumnsId) {
+          redistributeEqualWidths(state.data.nodes, removedFromColumnsId);
+        }
 
         if (state.selectedNodeId === id) {
           state.selectedNodeId = null;

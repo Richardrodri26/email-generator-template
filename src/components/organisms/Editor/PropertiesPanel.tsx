@@ -68,11 +68,18 @@ function SpacingControl({ label, topKey, rightKey, bottomKey, leftKey, style, on
 
 export function EditorPropertiesPanel() {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
-  const node = useEditorStore((state) => 
+  const node = useEditorStore((state) =>
     selectedNodeId ? state.data.nodes[selectedNodeId] : null
   );
+  const nodes = useEditorStore((state) => state.data.nodes);
   const updateNodeProps = useEditorStore((state) => state.updateNodeProps);
   const removeNode = useEditorStore((state) => state.removeNode);
+
+  // Detect if the selected node is a direct child of a COLUMNS node
+  const parentNode = selectedNodeId
+    ? Object.values(nodes).find((n) => n.children.includes(selectedNodeId)) ?? null
+    : null;
+  const isInsideColumns = parentNode?.type === "COLUMNS";
 
   if (!selectedNodeId || !node) {
     return (
@@ -93,6 +100,83 @@ export function EditorPropertiesPanel() {
 
   const handleBatchStyleChange = (updates: Record<string, string>) => {
     updateNodeProps(selectedNodeId, { style: { ...node.props.style, ...updates } });
+  };
+
+  // ── Column flex width ─────────────────────────────────────────────
+  // Compute current percentage of this node relative to all siblings in the COLUMNS parent.
+  const columnFlexPct: number = (() => {
+    if (!isInsideColumns || !parentNode || !node) return 100;
+    const totalFlex = parentNode.children.reduce(
+      (sum, cid) => sum + (parseFloat(nodes[cid]?.props.style?.flex || "1") || 1),
+      0,
+    );
+    const selfFlex = parseFloat(node.props.style?.flex || "1") || 1;
+    return (selfFlex / totalFlex) * 100;
+  })();
+
+  // Find the nearest predefined grid option (in %) for display.
+  const GRID_OPTIONS = [100, 91.6667, 83.3333, 75, 66.6667, 58.3333, 50, 41.6667, 33.3333, 25, 16.6667, 8.3333];
+  const nearestGridPct = GRID_OPTIONS.reduce((prev, cur) =>
+    Math.abs(cur - columnFlexPct) < Math.abs(prev - columnFlexPct) ? cur : prev,
+  );
+
+  // Set this column's flex % and adjust the last sibling so the total stays at 100%.
+  const handleColumnWidthChange = (newPctStr: string) => {
+    if (!isInsideColumns || !parentNode || !node || !selectedNodeId) return;
+    const newPct = parseFloat(newPctStr);
+    const children = parentNode.children;
+    const totalFlex = children.reduce(
+      (sum, cid) => sum + (parseFloat(nodes[cid]?.props.style?.flex || "1") || 1),
+      0,
+    );
+
+    // Normalize all siblings to their current % first (keeps the unit system consistent).
+    const currentPcts: Record<string, number> = {};
+    children.forEach((cid) => {
+      currentPcts[cid] = ((parseFloat(nodes[cid]?.props.style?.flex || "1") || 1) / totalFlex) * 100;
+    });
+
+    const lastSibId = [...children].reverse().find((cid) => cid !== selectedNodeId);
+    const otherPct = children.reduce((sum, cid) => {
+      if (cid === selectedNodeId || cid === lastSibId) return sum;
+      return sum + currentPcts[cid];
+    }, 0);
+
+    const minColPct = 10;
+    const clampedPct = Math.max(minColPct, Math.min(100 - otherPct - minColPct, newPct));
+    const lastPct = Math.max(minColPct, 100 - clampedPct - otherPct);
+
+    // Update "other" (middle) siblings normalized to %.
+    children.forEach((cid) => {
+      if (cid === selectedNodeId || cid === lastSibId) return;
+      const sibNode = nodes[cid];
+      if (sibNode) updateNodeProps(cid, { style: { ...sibNode.props.style, flex: String(+currentPcts[cid].toFixed(1)), width: undefined } });
+    });
+
+    updateNodeProps(selectedNodeId, { style: { ...node.props.style, flex: String(+clampedPct.toFixed(1)), width: undefined } });
+
+    if (lastSibId) {
+      const lastSib = nodes[lastSibId];
+      if (lastSib) updateNodeProps(lastSibId, { style: { ...lastSib.props.style, flex: String(+lastPct.toFixed(1)), width: undefined } });
+    }
+  };
+
+  // ── Column height ─────────────────────────────────────────────────
+  // When a node inside COLUMNS sets an explicit height, it must opt-out of "stretch"
+  // (which ignores height) by adding alignSelf: flex-start.
+  const handleColumnHeightChange = (value: string) => {
+    if (!isInsideColumns || !node || !selectedNodeId) return;
+    const isAuto = value === "auto" || value === "";
+    updateNodeProps(selectedNodeId, {
+      style: {
+        ...node.props.style,
+        // Use minHeight so content can still expand beyond the configured value.
+        // Clear height to avoid overriding minHeight.
+        height: undefined,
+        minHeight: isAuto ? undefined : value,
+        alignSelf: isAuto ? undefined : "flex-start",
+      },
+    });
   };
 
   return (
@@ -211,34 +295,71 @@ export function EditorPropertiesPanel() {
           <div className="space-y-3">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Size</h3>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Width</Label>
-              <select
-                value={node.props.style?.width || "100%"}
-                onChange={(e) => handleStyleChange("width", e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
-              >
-                <option value="100%">12/12 — Full</option>
-                <option value="91.6667%">11/12</option>
-                <option value="83.3333%">10/12</option>
-                <option value="75%">9/12 — Three Quarter</option>
-                <option value="66.6667%">8/12 — Two Third</option>
-                <option value="58.3333%">7/12</option>
-                <option value="50%">6/12 — Half</option>
-                <option value="41.6667%">5/12</option>
-                <option value="33.3333%">4/12 — One Third</option>
-                <option value="25%">3/12 — Quarter</option>
-                <option value="16.6667%">2/12</option>
-                <option value="8.3333%">1/12</option>
-              </select>
+              <Label className="text-xs text-muted-foreground mb-1 block">
+                {isInsideColumns ? "Column Width" : "Width"}
+              </Label>
+              {isInsideColumns ? (
+                <select
+                  value={`${nearestGridPct}%`}
+                  onChange={(e) => handleColumnWidthChange(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                >
+                  <option value="100%">12/12 — Full</option>
+                  <option value="91.6667%">11/12</option>
+                  <option value="83.3333%">10/12</option>
+                  <option value="75%">9/12 — Three Quarter</option>
+                  <option value="66.6667%">8/12 — Two Third</option>
+                  <option value="58.3333%">7/12</option>
+                  <option value="50%">6/12 — Half</option>
+                  <option value="41.6667%">5/12</option>
+                  <option value="33.3333%">4/12 — One Third</option>
+                  <option value="25%">3/12 — Quarter</option>
+                  <option value="16.6667%">2/12</option>
+                  <option value="8.3333%">1/12</option>
+                </select>
+              ) : (
+                <select
+                  value={node.props.style?.width || "100%"}
+                  onChange={(e) => handleStyleChange("width", e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                >
+                  <option value="100%">12/12 — Full</option>
+                  <option value="91.6667%">11/12</option>
+                  <option value="83.3333%">10/12</option>
+                  <option value="75%">9/12 — Three Quarter</option>
+                  <option value="66.6667%">8/12 — Two Third</option>
+                  <option value="58.3333%">7/12</option>
+                  <option value="50%">6/12 — Half</option>
+                  <option value="41.6667%">5/12</option>
+                  <option value="33.3333%">4/12 — One Third</option>
+                  <option value="25%">3/12 — Quarter</option>
+                  <option value="16.6667%">2/12</option>
+                  <option value="8.3333%">1/12</option>
+                </select>
+              )}
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Height</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">
+                {isInsideColumns ? "Min Height" : "Height"}
+              </Label>
               <Input
-                value={node.props.style?.height || "auto"}
-                onChange={(e) => handleStyleChange("height", e.target.value)}
+                value={
+                  isInsideColumns
+                    ? (node.props.style?.minHeight || "auto")
+                    : (node.props.style?.height || "auto")
+                }
+                onChange={(e) =>
+                  isInsideColumns
+                    ? handleColumnHeightChange(e.target.value)
+                    : handleStyleChange("height", e.target.value)
+                }
                 placeholder="auto"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">auto = shrink to content</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {isInsideColumns
+                  ? "auto = stretch to tallest column"
+                  : "auto = shrink to content"}
+              </p>
             </div>
           </div>
         )}

@@ -79,7 +79,7 @@ function DropIndicator() {
     </div>
   );
 }
-import { Plus, ImageIcon, Trash2, Copy, ArrowUp } from "lucide-react";
+import { Plus, ImageIcon, Trash2, Copy, ArrowUp, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -162,6 +162,7 @@ function NodeContextMenuItems({ nodeId }: { nodeId: string }) {
   const removeNode = useEditorStore((s) => s.removeNode);
   const addNode = useEditorStore((s) => s.addNode);
   const selectNode = useEditorStore((s) => s.selectNode);
+  const updateNodeProps = useEditorStore((s) => s.updateNodeProps);
 
   if (!node) return null;
 
@@ -171,6 +172,8 @@ function NodeContextMenuItems({ nodeId }: { nodeId: string }) {
 
   const canDuplicate = DUPLICABLE_TYPES.has(node.type);
   const isColumns = node.type === "COLUMNS";
+  const isInsideColumns = parentNode?.type === "COLUMNS";
+  const hasMinHeight = !!node.props.style?.minHeight;
 
   const handleDuplicate = () => {
     if (!parentId || !parentNode) return;
@@ -228,6 +231,15 @@ function NodeContextMenuItems({ nodeId }: { nodeId: string }) {
           Add Column
         </ContextMenuItem>
       )}
+      {isInsideColumns && hasMinHeight && (
+        <ContextMenuItem onClick={() => {
+          const { minHeight: _mh, alignSelf: _as, ...rest } = node.props.style ?? {};
+          updateNodeProps(nodeId, { style: rest });
+        }}>
+          <RotateCcw className="size-4" />
+          Reset Min Height
+        </ContextMenuItem>
+      )}
       <ContextMenuSeparator />
       <ContextMenuItem variant="destructive" onClick={() => removeNode(nodeId)}>
         <Trash2 className="size-4" />
@@ -250,6 +262,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
 
   const { previewDark } = useEmailDarkModeStore();
   const { previewSubstitution, data: varData } = useVariablesStore();
+  const parentFlexDirection = useContext(FlexDirectionContext);
 
   const [localSize, setLocalSize] = useState<{
     width?: string;
@@ -327,7 +340,12 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
         ev.preventDefault();
         const s: Record<string, string> = {};
         if (dir !== "v") s.width = snapToGrid(Math.max(minContentW, startW + (ev.clientX - startX)), parentW);
-        if (dir !== "h") s.height = `${Math.max(minContentH, startH + (ev.clientY - startY))}px`;
+        if (dir !== "h") {
+          const hVal = `${Math.max(minContentH, startH + (ev.clientY - startY))}px`;
+          // In COLUMNS context use minHeight for live preview so it matches final persisted value.
+          if (parentFlexDirection === "row") s.minHeight = hVal;
+          else s.height = hVal;
+        }
         setLocalSize(s);
       };
 
@@ -337,18 +355,93 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
 
         const s: Record<string, string> = {};
         if (dir !== "v") s.width = snapToGrid(Math.max(minContentW, startW + (ev.clientX - startX)), parentW);
-        if (dir !== "h") s.height = `${Math.max(minContentH, startH + (ev.clientY - startY))}px`;
+        if (dir !== "h") {
+          const hVal = `${Math.max(minContentH, startH + (ev.clientY - startY))}px`;
+          if (parentFlexDirection === "row") s.minHeight = hVal;
+          else s.height = hVal;
+        }
 
-        updateNodeProps(nodeId, {
-          style: { ...node.props.style, ...s },
-        });
+        // ── Column resize constraint ─────────────────────────────────
+        // Use flex-grow proportional values (not %) to avoid EdgeDropZone+gap overflow.
+        // totalContentPx = sum of all column children actual pixel widths.
+        if (parentFlexDirection === "row" && dir !== "v") {
+          const storeState = useEditorStore.getState();
+          const liveNodes = storeState.data.nodes;
+          const liveUpdate = storeState.updateNodeProps;
+          const parentEntry = Object.entries(liveNodes).find(
+            ([, n]) => n.children.includes(nodeId)
+          );
+          if (parentEntry) {
+            const [, colsNode] = parentEntry;
+            if (colsNode.type === "COLUMNS" && colsNode.children.length > 1) {
+              const siblings = colsNode.children.filter((id) => id !== nodeId);
+              const getSibPx = (sid: string) =>
+                document.getElementById(`node-${sid}`)?.offsetWidth ?? 1;
+              const totalContentPx = startW + siblings.reduce((sum, sid) => sum + getSibPx(sid), 0);
+              const minPx = totalContentPx * 0.1;
+              const maxPx = totalContentPx - siblings.length * minPx;
+              const newPx = Math.max(minPx, Math.min(maxPx, startW + (ev.clientX - startX)));
+
+              // Last sibling absorbs the rest
+              const lastSibId = siblings[siblings.length - 1];
+              const otherSibs = siblings.slice(0, -1);
+              const otherPx = otherSibs.reduce((sum, sid) => sum + getSibPx(sid), 0);
+              const lastSibPx = Math.max(minPx, totalContentPx - newPx - otherPx);
+
+              // Normalize all siblings to percentage-based flex so Width selector stays in sync.
+              // Percentages: each column's flex value = its % of total content width (sums to 100).
+              const toPct = (px: number) => +(px / totalContentPx * 100).toFixed(1);
+              const newFlexPct = toPct(newPx);
+              const lastFlexPct = toPct(lastSibPx);
+
+              // Normalize "other" (middle) siblings to their current % so the unit system stays consistent.
+              otherSibs.forEach((sid) => {
+                const sibNode = liveNodes[sid];
+                if (sibNode) {
+                  liveUpdate(sid, {
+                    style: { ...sibNode.props.style, flex: String(toPct(getSibPx(sid))), width: undefined },
+                  });
+                }
+              });
+
+              liveUpdate(nodeId, {
+                style: {
+                  ...node.props.style,
+                  flex: String(newFlexPct),
+                  width: undefined,
+                  ...(s.minHeight ? { height: undefined, minHeight: s.minHeight, alignSelf: "flex-start" } : {}),
+                },
+              });
+              const lastSibNode = liveNodes[lastSibId];
+              if (lastSibNode) {
+                liveUpdate(lastSibId, {
+                  style: { ...lastSibNode.props.style, flex: String(lastFlexPct), width: undefined },
+                });
+              }
+              setLocalSize(null);
+              return;
+            }
+          }
+        }
+        // ── Default save ─────────────────────────────────────────────
+        // In COLUMNS context the height was already stored as minHeight in `s`.
+        // Also set alignSelf: flex-start so the container respects its own height.
+        if (parentFlexDirection === "row" && s.minHeight) {
+          updateNodeProps(nodeId, {
+            style: { ...node.props.style, ...s, height: undefined, alignSelf: "flex-start" },
+          });
+        } else {
+          updateNodeProps(nodeId, {
+            style: { ...node.props.style, ...s },
+          });
+        }
         setLocalSize(null);
       };
 
       document.addEventListener("pointermove", move);
       document.addEventListener("pointerup", up);
     },
-    [nodeId, node.props.style, updateNodeProps],
+    [nodeId, node.props.style, node.type, parentFlexDirection, updateNodeProps],
   );
 
   // ── Drag overlay elements ────
@@ -441,7 +534,7 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     "";
 
   // ── Wrapper ────
-  const isEdgeDropContainer = EDGE_DROP_CONTAINER_TYPES.has(node.type);
+  const isEdgeDropContainer = EDGE_DROP_CONTAINER_TYPES.has(node.type) && parentFlexDirection !== "row";
 
   const wrapWithSelection = (children: React.ReactNode) => {
     const nodeEl = (
@@ -466,12 +559,19 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
         style={{
           ...merged,
           ...draggingStyle,
+          // When inside a COLUMNS (flex row), use flex-grow for proportional sizing.
+          // flex-basis % cannot be used here: EdgeDropZones + gap cause overflow.
+          ...(parentFlexDirection === "row" && node.type !== "ROOT"
+            ? { flex: parseFloat(String(merged.flex)) || 1, minWidth: 0, width: "auto" }
+            : {}),
           minHeight:
             node.type === "ROOT"
               ? "100%"
               : isContainer && node.children.length === 0
-                ? "80px"
-                : undefined,
+                // In row context (inside COLUMNS) the parent's stretch determines height — no hardcoded min.
+                // In column context use 80px so the empty drop zone is always visible.
+                ? (parentFlexDirection === "row" ? (merged.minHeight || undefined) : (merged.minHeight || "80px"))
+                : merged.minHeight,
           position: isAbsolute ? "absolute" : "relative",
           ...(isAbsolute ? {
             touchAction: "none",
@@ -538,7 +638,12 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
 
         {/* Empty container placeholder */}
         {isContainer && node.children.length === 0 && (
-          <div className="text-muted-foreground/60 text-sm text-center py-10 w-full flex flex-col items-center gap-2 border-2 border-dashed border-muted-foreground/20 rounded-md pointer-events-none select-none">
+          <div className={[
+            "text-muted-foreground/60 text-sm text-center w-full flex flex-col items-center justify-center gap-2",
+            "border-2 border-dashed border-muted-foreground/20 rounded-md pointer-events-none select-none",
+            // In row context fill available height; in column context keep fixed padding.
+            parentFlexDirection === "row" ? "flex-1 min-h-[40px] py-2" : "py-10",
+          ].join(" ")}>
             <Plus className="h-5 w-5 text-muted-foreground/30" />
             <span>Drag a block here</span>
           </div>
@@ -780,9 +885,14 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
             <div
               style={{
                 display: "flex",
-                gap: "16px",
                 width: "100%",
                 ...merged,
+                // Always enforce row direction; fall back to sensible defaults
+                flexDirection: "row",
+                gap: merged.gap ?? "16px",
+                alignItems: merged.alignItems ?? "stretch",
+                // Clip children when COLUMNS is resized smaller than its content.
+                overflow: "hidden",
               }}
             >
               <ContainerChildren nodeId={nodeId} childIds={node.children} />
@@ -827,21 +937,23 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
     case "CARD": {
       const customCardBg = merged.backgroundColor ?? undefined;
       return wrapWithSelection(
-        <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
-          <Card style={{ width: "100%", backgroundColor: customCardBg }}>
-            {(node.props.cardTitle || node.props.cardDescription) && (
-              <CardHeader>
-                {node.props.cardTitle && <CardTitle>{node.props.cardTitle}</CardTitle>}
-                {node.props.cardDescription && (
-                  <CardDescription>{node.props.cardDescription}</CardDescription>
-                )}
-              </CardHeader>
-            )}
-            <CardContent>
-              <ContainerChildren nodeId={nodeId} childIds={node.children} />
-            </CardContent>
-          </Card>
-        </SortableContext>,
+        <FlexDirectionContext.Provider value="column">
+          <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
+            <Card style={{ width: "100%", backgroundColor: customCardBg }}>
+              {(node.props.cardTitle || node.props.cardDescription) && (
+                <CardHeader>
+                  {node.props.cardTitle && <CardTitle>{node.props.cardTitle}</CardTitle>}
+                  {node.props.cardDescription && (
+                    <CardDescription>{node.props.cardDescription}</CardDescription>
+                  )}
+                </CardHeader>
+              )}
+              <CardContent>
+                <ContainerChildren nodeId={nodeId} childIds={node.children} />
+              </CardContent>
+            </Card>
+          </SortableContext>
+        </FlexDirectionContext.Provider>,
       );
     }
 
@@ -978,21 +1090,25 @@ function NodeRenderer({ nodeId }: NodeRendererProps) {
       );
 
     /* ── Container ── */
-    case "CONTAINER":
+    case "CONTAINER": {
+      const containerDir = (node.props.style?.flexDirection as FlexDirection) || "column";
       return wrapWithSelection(
-        <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
-          <div style={{
-            display: "flex",
-            flexDirection: node.props.style?.flexDirection || "column",
-            gap: node.props.style?.gap || "0px",
-            alignItems: node.props.style?.alignItems || "stretch",
-            justifyContent: node.props.style?.justifyContent || "flex-start",
-            ...merged,
-          }}>
-            <ContainerChildren nodeId={nodeId} childIds={node.children} />
-          </div>
-        </SortableContext>,
+        <FlexDirectionContext.Provider value={containerDir}>
+          <SortableContext items={node.children} strategy={verticalListSortingStrategy}>
+            <div style={{
+              display: "flex",
+              flexDirection: containerDir,
+              gap: node.props.style?.gap || "0px",
+              alignItems: node.props.style?.alignItems || "stretch",
+              justifyContent: node.props.style?.justifyContent || "flex-start",
+              ...merged,
+            }}>
+              <ContainerChildren nodeId={nodeId} childIds={node.children} />
+            </div>
+          </SortableContext>
+        </FlexDirectionContext.Provider>,
       );
+    }
 
     default:
       return null;
